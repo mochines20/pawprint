@@ -3,6 +3,7 @@ const SNEAK_PEEK_GIF = "__PAWPRINT_SNEAK_PEEK_GIF__";
 const SNEAK_PEEK_SVG = __PAWPRINT_SNEAK_PEEK_SVG__;
 const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
 const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
+const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v1'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
@@ -876,6 +877,9 @@ export default {
       }
       if (request.method === "GET" && url.pathname === "/assets/cat-paw.svg") {
         return new Response(CAT_PAW_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawprint-cat.js") {
+        return new Response(PAWPRINT_CAT_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
