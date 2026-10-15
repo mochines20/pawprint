@@ -153,6 +153,10 @@
     }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css">
+    <style>
+      html{scroll-behavior:smooth}
+      @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+    </style>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -323,5 +327,28 @@
     const currentLoadDashboard=window.loadDashboard;if(currentLoadDashboard)window.loadDashboard=async()=>{const data=await currentLoadDashboard();try{const response=await fetch('/api/sightings',{credentials:'include'});const result=await response.json();window.renderLiveMap(result.sightings||[]);}catch{window.renderLiveMap([]);}return data;};
     if(document.body.classList.contains('is-app'))window.loadDashboard?.();
   </script>
+    <script>
+      (() => {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const scrollBehavior = reduceMotion ? 'auto' : 'smooth';
+
+        document.addEventListener('click', event => {
+          const screenButton = event.target.closest('[data-screen]');
+          if (!screenButton) return;
+          requestAnimationFrame(() => {
+            document.querySelector('.app-view')?.scrollIntoView({
+              behavior: scrollBehavior,
+              block: 'start'
+            });
+          });
+        });
+
+        window.addEventListener('hashchange', () => {
+          if (location.hash === '#app' || location.hash === '#top') {
+            window.scrollTo({top: 0, behavior: scrollBehavior});
+          }
+        });
+      })();
+    </script>
 </body>
 </html>
