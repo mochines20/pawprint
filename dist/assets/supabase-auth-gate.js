@@ -52,6 +52,9 @@ function setStatus(message, kind = "") {
 
 function authMarkup(accountMode = "login") {
   const configured = Boolean(client);
+  const providers = authConfig?.providers || {};
+  const googleEnabled = configured && providers.google === true;
+  const appleEnabled = configured && providers.apple === true;
   if (accountMode === "reset") return `<button class="auth-close" type="button" data-close-auth aria-label="Close password reset">×</button>
     <p class="auth-kicker">Private by default</p><h2>Reset your password.</h2>
     <p>Supabase will send a secure reset link. Pawprint never stores your password.</p>
@@ -86,7 +89,8 @@ function authMarkup(accountMode = "login") {
       <button class="auth-submit" type="submit" ${configured ? "" : "disabled"}>Send magic link</button>
     </form>
     <div class="auth-divider"><span>or continue with</span></div>
-    <div class="auth-socials"><button class="auth-social" type="button" data-auth-provider="google" ${configured ? "" : "disabled"}>Google</button><button class="auth-social" type="button" data-auth-provider="apple" ${configured ? "" : "disabled"}>Apple</button></div>
+    <div class="auth-socials"><button class="auth-social" type="button" data-auth-provider="google" ${googleEnabled ? "" : "disabled"}>Google${googleEnabled ? "" : " · setup required"}</button><button class="auth-social" type="button" data-auth-provider="apple" ${appleEnabled ? "" : "disabled"}>Apple${appleEnabled ? "" : " · setup required"}</button></div>
+    ${configured && (!googleEnabled || !appleEnabled) ? `<p class="auth-provider-note">Email login and magic links are ready. Google and Apple become available after their OAuth providers are configured in Supabase.</p>` : ""}
     <p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite">${configured ? "" : "Supabase Auth is not configured for this preview yet."}</p>
     <p class="auth-note">Pawprint stores only your chosen nickname, avatar, and age group in your public profile. Email and passwords stay with Supabase Auth.</p>`;
 }
@@ -225,6 +229,7 @@ async function handleResetConfirm(event) {
 
 async function handleProvider(provider) {
   if (!client) return setStatus("Supabase Auth is not configured for this preview yet.", "error");
+  if (authConfig?.providers?.[provider] !== true) return setStatus(`${provider === "google" ? "Google" : "Apple"} sign-in is not enabled in Supabase yet. Use email login for now.`, "error");
   const result = await client.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}/auth/callback` } });
   if (result.error) setStatus(result.error.message, "error");
 }

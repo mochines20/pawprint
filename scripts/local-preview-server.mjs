@@ -47,6 +47,10 @@ const server = createServer(async (request, response) => {
       enabled: Boolean(supabaseUrl && supabaseAnonKey),
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
+      providers: {
+        google: process.env.PAWPRINT_GOOGLE_AUTH_ENABLED === "true",
+        apple: process.env.PAWPRINT_APPLE_AUTH_ENABLED === "true",
+      },
     }));
     return;
   }

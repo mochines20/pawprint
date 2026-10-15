@@ -841,7 +841,7 @@ async function expireSightings(request, env) {
 
 async function api(request, env, url) {
   if (url.pathname === "/api/health") return json({ ok: true, service: "pawprint", time: now() });
-  if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "" });
+  if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "", providers: { google: env.SUPABASE_GOOGLE_AUTH_ENABLED === "true", apple: env.SUPABASE_APPLE_AUTH_ENABLED === "true" } });
   if (url.pathname === "/api/capture-sessions" && request.method === "POST") return startCaptureSession(request, env);
   if (url.pathname === "/api/dashboard" && request.method === "GET") return getDashboard(request, env);
   if (url.pathname === "/api/progress" && request.method === "GET") return getProgress(request, env);
