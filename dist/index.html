@@ -114,6 +114,7 @@
     }
     .app-map:after{content:"PHILIPPINES · APPROXIMATE PAWPRINTS"}
     .is-app .app-header-actions{display:none}
+    .app-map .map-empty{position:absolute;inset:50% auto auto 50%;z-index:4;width:max-content;max-width:calc(100% - 34px);padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.9);color:#777b82;font-size:.64rem;font-weight:900;letter-spacing:.04em;transform:translate(-50%,-50%);text-align:center}
     /* Brand palette: black + orange, with neutral white/gray surfaces for legibility. */
     :root{--care:#d97706}
     .care-banner{background:#fff4d6;color:#7a4a00}
@@ -274,6 +275,27 @@
       };
       const dashboard=document.getElementById('dashboard');
       if(dashboard){new MutationObserver(addProfileLandingButton).observe(dashboard,{childList:true,subtree:true});addProfileLandingButton()}
+    })();
+  </script>
+  <script>
+    (()=>{
+      const formatJournalDate=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?'Recently':date.toLocaleDateString([], {month:'short',day:'numeric'});};
+      const renderHomeJournal=entries=>{
+        const list=document.getElementById('journalList');
+        if(!list)return;
+        list.replaceChildren();
+        if(!entries.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent='No pawprints yet. Your first validated sighting will appear here.';list.appendChild(empty);return;}
+        entries.slice(0,2).forEach(entry=>{const row=document.createElement('div');row.className='journal-item';const icon=document.createElement('span');icon.className='journal-cat';icon.textContent=String(entry.catType||'').toLowerCase().includes('tuxedo')?'🐈‍⬛':'🐈';const copy=document.createElement('span');const name=document.createElement('strong');name.textContent=entry.catType||'Unclassified cat';const date=document.createElement('small');date.textContent=`${formatJournalDate(entry.spottedAt)} · ${entry.firstSpotted?'first spot':'logged'}`;copy.append(name,date);row.append(icon,copy);list.appendChild(row);});
+      };
+      const refreshHomeJournal=async()=>{try{const response=await fetch('/api/journal',{credentials:'include'});if(!response.ok)return;const data=await response.json();renderHomeJournal(data.entries||[]);}catch{}};
+      const currentLoadDashboard=window.loadDashboard;
+      if(currentLoadDashboard)window.loadDashboard=async()=>{const result=await currentLoadDashboard();await refreshHomeJournal();return result;};
+      const currentRenderMap=window.renderLiveMap;
+      if(currentRenderMap)window.renderLiveMap=sightings=>{currentRenderMap(sightings);const map=document.querySelector('.app-map');if(!map)return;map.querySelectorAll('.mini-pin:not(.live-pin)').forEach(pin=>pin.remove());let empty=map.querySelector('.map-empty');if(!sightings.length){if(!empty){empty=document.createElement('span');empty.className='map-empty';empty.textContent='No public pawprints nearby yet';map.appendChild(empty);}}else if(empty)empty.remove();};
+      const refreshActualCare=async()=>{const list=document.getElementById('flagList');if(!list||list.dataset.actualChecked)return;list.dataset.actualChecked='1';try{const response=await fetch('/api/care-flags',{credentials:'include'});if(!response.ok)return;const data=await response.json();if(!(data.flags||[]).length){list.replaceChildren();const empty=document.createElement('div');empty.className='empty-state';empty.textContent='No Care Flags yet. If something feels off, you can raise a gentle community review.';list.appendChild(empty);}}catch{}};
+      const dashboard=document.getElementById('dashboard');
+      if(dashboard)new MutationObserver(()=>{refreshActualCare()}).observe(dashboard,{childList:true,subtree:true});
+      refreshHomeJournal();refreshActualCare();
     })();
   </script>
 </body>
