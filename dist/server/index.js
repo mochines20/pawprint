@@ -32,6 +32,7 @@ async function requireUser(request, env) {
      ON CONFLICT(id) DO UPDATE SET email=excluded.email, display_name=excluded.display_name, updated_at=excluded.updated_at`,
   ).bind(user.id, user.email, user.name, timestamp, timestamp).run();
   await ensureRuntimeTables(env);
+  await env.DB.prepare("INSERT OR IGNORE INTO user_settings (user_id,updated_at) VALUES (?,?)").bind(user.id, timestamp).run();
   return user;
 }
 
