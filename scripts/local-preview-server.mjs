@@ -27,8 +27,14 @@ function safePath(requestPath) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (url.pathname === "/api/auth/config") {
+    const supabaseUrl = process.env.PAWPRINT_SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.PAWPRINT_SUPABASE_ANON_KEY || "";
     response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
-    response.end(JSON.stringify({ enabled: false, url: "", anonKey: "" }));
+    response.end(JSON.stringify({
+      enabled: Boolean(supabaseUrl && supabaseAnonKey),
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    }));
     return;
   }
   if (url.pathname === "/api/journal" && request.method === "GET") {
