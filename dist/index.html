@@ -112,6 +112,7 @@
       .mobile-home-tools{grid-column:1/-1}
       .mobile-nav{grid-column:1/-1}
     }
+    .app-map:after{content:"PHILIPPINES · APPROXIMATE PAWPRINTS"}
   </style>
 </head>
 <body>
@@ -221,6 +222,18 @@
       window.addEventListener('hashchange',()=>setTimeout(addMobileHomeTreatment,40));
       window.addEventListener('load',()=>setTimeout(addMobileHomeTreatment,40));
       setTimeout(addMobileHomeTreatment,120);
+    })();
+  </script>
+  <script>
+    (()=>{
+      const scopeCopy=()=>{
+        const header=document.querySelector('.app-header .eyebrow'),showcase=document.querySelector('.device-main .device-sub'),map=document.querySelector('#safety .mock-card.wide h3'),roadmap=document.querySelector('#roadmap .section-head .lede');
+        if(header)header.textContent='Philippines · browser preview';
+        if(showcase)showcase.textContent='Philippines · public sightings';
+        if(map)map.textContent='Philippines map';
+        if(roadmap)roadmap.textContent='The first version is built for cats across the Philippines. The rest should earn its place through real use.';
+      };
+      scopeCopy();
     })();
   </script>
 </body>
