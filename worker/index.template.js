@@ -1,6 +1,7 @@
 const APP_HTML = __PAWPRINT_HTML__;
 const SNEAK_PEEK_GIF = "__PAWPRINT_SNEAK_PEEK_GIF__";
-const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [] });
+const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
+const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v1'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
@@ -864,6 +865,9 @@ export default {
         const binary = atob(SNEAK_PEEK_GIF);
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
         return new Response(bytes, { headers: { "content-type": "image/gif", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawprint-icon.svg") {
+        return new Response(PAWPRINT_ICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
       }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
