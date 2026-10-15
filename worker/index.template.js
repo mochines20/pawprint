@@ -650,12 +650,13 @@ async function getProgress(request, env) {
 
 async function getLeaderboards(request, env) {
   const scope = ["barangay", "city", "country"].includes(new URL(request.url).searchParams.get("scope")) ? new URL(request.url).searchParams.get("scope") : "country";
-  const rows = await env.DB.prepare(`SELECT users.id,COALESCE(users.display_name,'Pawprint spotter') AS name,
+  const regionExpression = scope === "barangay" ? "COALESCE(MAX(sightings.barangay_name),'Approximate barangay')" : scope === "city" ? "COALESCE(MAX(sightings.city_name),'Approximate city')" : "'Philippines'";
+  const rows = await env.DB.prepare(`SELECT users.id,COALESCE(users.display_name,'Pawprint spotter') AS name,${regionExpression} AS region,
       COUNT(DISTINCT sightings.id) AS sightings,COALESCE(SUM(reward_ledger.amount),0) AS xp
       FROM users LEFT JOIN sightings ON sightings.user_id=users.id AND sightings.validation_status='accepted'
       LEFT JOIN reward_ledger ON reward_ledger.user_id=users.id
       GROUP BY users.id,users.display_name ORDER BY xp DESC,sightings DESC LIMIT 50`).all();
-  return json({ scope, leaders: rows.results.map((row, index) => ({ rank: index + 1, id: row.id, name: row.name, sightings: Number(row.sightings || 0), xp: Number(row.xp || 0), level: levelFor(row.xp) })) });
+  return json({ scope, leaders: rows.results.map((row, index) => ({ rank: index + 1, id: row.id, name: row.name, region: row.region, sightings: Number(row.sightings || 0), xp: Number(row.xp || 0), level: levelFor(row.xp) })) });
 }
 
 async function getNotifications(request, env) {
