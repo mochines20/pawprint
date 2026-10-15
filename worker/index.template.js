@@ -6,7 +6,7 @@ const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
 const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
 const SUPABASE_AUTH_JS = __PAWPRINT_SUPABASE_AUTH_JS__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
-const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v2'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
+const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v3'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -906,7 +906,7 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/pawprint-cat.js") {
         return new Response(PAWPRINT_CAT_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
-      if (request.method === "GET" && url.pathname === "/assets/supabase-auth.js") {
+      if (request.method === "GET" && ["/assets/supabase-auth.js", "/assets/supabase-auth-gate.js"].includes(url.pathname)) {
         return new Response(SUPABASE_AUTH_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/auth/callback" || url.pathname === "/onboarding")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
