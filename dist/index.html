@@ -222,6 +222,18 @@
     .feature-icon svg{width:30px;height:30px}
     @media(max-width:600px){.feature-icon{width:56px;height:56px;margin-bottom:22px;font-size:1.65rem}.feature-icon svg{width:29px;height:29px}}
   </style>
+  <style>
+    /* Soft screen transitions keep menu and task-bar navigation connected. */
+    .app-main .screen-panel{opacity:1;transform:translateY(0);transition:opacity .28s ease,transform .28s cubic-bezier(.2,.8,.2,1)}
+    .app-main.is-transitioning .screen-panel{opacity:0;transform:translateY(10px)}
+    .app-main .app-header h1{transition:opacity .2s ease,transform .2s ease}
+    .app-main.is-transitioning .app-header h1{opacity:.35;transform:translateY(4px)}
+    [data-screen], [data-goto-screen], [data-care-kind], [data-community-kind], [data-more-wrapped], [data-more-share], [data-open-capture], [data-rescue-request], [data-toggle]{transition:transform .18s ease,background-color .18s ease,color .18s ease,box-shadow .18s ease}
+    [data-screen]:active, [data-goto-screen]:active, [data-care-kind]:active, [data-community-kind]:active, [data-more-wrapped]:active, [data-more-share]:active, [data-open-capture]:active, [data-rescue-request]:active, [data-toggle]:active{transform:scale(.96)}
+    .menu-tap{animation:menuTap .34s ease}
+    @keyframes menuTap{0%{transform:scale(1)}45%{transform:scale(.94)}100%{transform:scale(1)}}
+    @media(prefers-reduced-motion:reduce){.app-main .screen-panel,.app-main .app-header h1,[data-screen],[data-goto-screen],[data-care-kind],[data-community-kind],[data-more-wrapped],[data-more-share],[data-open-capture],[data-rescue-request],[data-toggle]{transition:none!important}.app-main.is-transitioning .screen-panel,.app-main.is-transitioning .app-header h1{opacity:1;transform:none}.menu-tap{animation:none}}
+  </style>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -535,6 +547,31 @@
   </script>
   <script>
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js?v=2').catch(() => {}));
+  </script>
+  <script>
+    (() => {
+      const appMain = () => document.querySelector('.app-main');
+      const motionAllowed = () => !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const beginScreenTransition = () => {
+        const main = appMain();
+        if (!main || !motionAllowed()) return;
+        main.classList.remove('is-transitioning');
+        void main.offsetWidth;
+        main.classList.add('is-transitioning');
+        window.clearTimeout(window.__pawprintTransitionTimer);
+        window.__pawprintTransitionTimer = window.setTimeout(() => main.classList.remove('is-transitioning'), 320);
+      };
+      document.addEventListener('click', event => {
+        const target = event.target.closest?.('[data-screen],[data-goto-screen]');
+        if (target) beginScreenTransition();
+        const task = event.target.closest?.('[data-care-kind],[data-community-kind],[data-more-wrapped],[data-more-share],[data-open-capture],[data-rescue-request],[data-toggle],#captureBtn,#careBtn,.panel-actions .btn,.more-actions .btn');
+        if (task && motionAllowed()) {
+          task.classList.remove('menu-tap');
+          void task.offsetWidth;
+          task.classList.add('menu-tap');
+        }
+      }, true);
+    })();
   </script>
   <script type="module" src="/assets/supabase-auth.js"></script>
 </body>
