@@ -4,12 +4,14 @@ Pawprint is a browser-first progressive web app for photographing street cats, c
 
 ## Current project status
 
-The browser-first product slice is now backed by a Cloudflare Worker deployment. The site uses platform identity headers for authentication, D1 for structured data, R2 for private photo storage, browser camera and geolocation APIs for capture, and a privacy-safe geohash center for public map results.
+The browser-first product slice is now backed by a Cloudflare Worker deployment. Supabase Auth owns magic-link, Google, and Apple authentication; the Worker verifies Supabase bearer tokens and never stores passwords or provider tokens. D1 stores application data, R2 stores private photos, browser camera and geolocation APIs power capture, and public map results use privacy-safe geohash centers.
 
 ## Documentation
 
 - [Sprint 01: Documentation and Core Functions](docs/SPRINT-01-DOCUMENTATION-AND-FUNCTIONS.md)
 - [Function Contracts](docs/FUNCTION-CONTRACTS.md)
+- [Supabase Auth setup and profile RLS](docs/SUPABASE-AUTH-SETUP.md)
+- [Supabase profile migration](docs/supabase-auth.sql)
 
 ## Runtime implementation
 
