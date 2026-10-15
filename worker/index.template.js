@@ -79,6 +79,8 @@ async function ensureRuntimeTables(env) {
     env.DB.prepare("CREATE INDEX IF NOT EXISTS capture_sessions_user_idx ON capture_sessions (user_id, created_at DESC)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS reward_ledger_user_idx ON reward_ledger (user_id, created_at DESC)"),
   ]);
+  // Keep existing installations compatible with the richer capture flow.
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN description TEXT").run(); } catch { /* column already exists */ }
 }
 
 function encodeGeohash(latitude, longitude, precision = 6) {
@@ -153,11 +155,12 @@ async function writeAudit(env, userId, action, entityType, entityId, metadata = 
 }
 
 async function getSightings(request, env) {
+  await ensureRuntimeTables(env);
   const user = userFrom(request);
   const current = now();
   const rows = user
     ? await env.DB.prepare(
-      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility,
+      `SELECT id, user_id, cat_type, description, public_geohash, captured_at, published_at, expires_at, visibility,
               EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings
        WHERE validation_status='accepted' AND published_at <= ? AND expires_at > ?
@@ -166,7 +169,7 @@ async function getSightings(request, env) {
        ORDER BY captured_at DESC LIMIT 200`,
     ).bind(current, current, user.id, user.id).all()
     : await env.DB.prepare(
-      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility,
+      `SELECT id, user_id, cat_type, description, public_geohash, captured_at, published_at, expires_at, visibility,
               EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings WHERE validation_status='accepted' AND visibility='public' AND published_at <= ? AND expires_at > ?
        ORDER BY captured_at DESC LIMIT 200`,
@@ -174,9 +177,12 @@ async function getSightings(request, env) {
   return rows.results.map((row) => ({
     id: row.id,
     catType: row.cat_type,
+    description: row.description || "",
     area: geohashCenter(row.public_geohash),
     capturedAt: row.captured_at,
+    publishedAt: row.published_at,
     expiresAt: row.expires_at,
+    isOwner: Boolean(user && row.user_id === user.id),
     emergency: Boolean(row.emergency),
   }));
 }
@@ -329,8 +335,9 @@ async function createSighting(request, env) {
   const idempotencyKey = String(form.get("idempotencyKey") || "").slice(0, 160);
   const latitude = Number(form.get("latitude"));
   const longitude = Number(form.get("longitude"));
+  const description = String(form.get("description") || "").trim().slice(0, 280);
   const visibility = ["public", "friends", "private"].includes(String(form.get("visibility"))) ? String(form.get("visibility")) : "friends";
-  if (!captureSessionId || !idempotencyKey || !(photo instanceof File) || !photo.type.startsWith("image/") || photo.size > 10 * 1024 * 1024 || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+  if (!captureSessionId || !idempotencyKey || description.length < 8 || !(photo instanceof File) || !photo.type.startsWith("image/") || photo.size > 10 * 1024 * 1024 || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
     return json({ error: "INVALID_SIGHTING" }, 400);
   }
   const existingRequest = await env.DB.prepare("SELECT response_json FROM request_keys WHERE user_id=? AND request_key=?").bind(user.id, idempotencyKey).first();
@@ -352,9 +359,9 @@ async function createSighting(request, env) {
   const expiresAt = new Date(uploadedAt.getTime() + 24 * 60 * 60 * 1000);
   const validation = await validatePhoto(env, bytes, photo.type);
   await env.DB.prepare(
-    `INSERT INTO sightings (id,user_id,photo_key,photo_hash,cat_type,validation_status,validation_reason,visibility,latitude,longitude,public_geohash,captured_at,uploaded_at,published_at,expires_at,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  ).bind(sightingId, user.id, photoKey, photoHash, validation.catType, validation.status, validation.reason, visibility, latitude, longitude, encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(), publishedAt.toISOString(), expiresAt.toISOString(), uploadedAt.toISOString()).run();
+    `INSERT INTO sightings (id,user_id,photo_key,photo_hash,cat_type,description,validation_status,validation_reason,visibility,latitude,longitude,public_geohash,captured_at,uploaded_at,published_at,expires_at,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(sightingId, user.id, photoKey, photoHash, validation.catType, description, validation.status, validation.reason, visibility, latitude, longitude, encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(), publishedAt.toISOString(), expiresAt.toISOString(), uploadedAt.toISOString()).run();
   let streak = null;
   if (validation.status === "accepted") {
     const previousCat = await env.DB.prepare("SELECT 1 FROM journal_entries WHERE user_id=? AND cat_type=? LIMIT 1").bind(user.id, validation.catType || "Unclassified cat").first();
@@ -365,9 +372,25 @@ async function createSighting(request, env) {
   }
   await env.DB.prepare("UPDATE capture_sessions SET used_at=? WHERE id=? AND user_id=?").bind(now(), captureSessionId, user.id).run();
   await writeAudit(env, user.id, "sighting.created", "sighting", sightingId, { validationStatus: validation.status, visibility });
-  const responseBody = { sightingId, status: validation.status, reason: validation.reason, expiresAt: expiresAt.toISOString(), rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
+  const responseBody = { sightingId, status: validation.status, reason: validation.reason, description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
   await env.DB.prepare("INSERT INTO request_keys (user_id,request_key,response_json,created_at) VALUES (?,?,?,?)").bind(user.id, idempotencyKey, JSON.stringify(responseBody), now()).run();
   return json(responseBody, 201);
+}
+
+async function deleteSighting(request, env, sightingId) {
+  const user = await requireUser(request, env);
+  const sighting = await env.DB.prepare("SELECT id,photo_key FROM sightings WHERE id=? AND user_id=?").bind(sightingId, user.id).first();
+  if (!sighting) return json({ error: "SIGHTING_NOT_FOUND" }, 404);
+  if (env.BUCKET && sighting.photo_key) await env.BUCKET.delete(sighting.photo_key);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM care_flags WHERE sighting_id=?").bind(sightingId),
+    env.DB.prepare("DELETE FROM reports WHERE target_type='sighting' AND target_id=?").bind(sightingId),
+    env.DB.prepare("DELETE FROM reward_ledger WHERE sighting_id=?").bind(sightingId),
+    env.DB.prepare("DELETE FROM journal_entries WHERE sighting_id=?").bind(sightingId),
+    env.DB.prepare("DELETE FROM sightings WHERE id=? AND user_id=?").bind(sightingId, user.id),
+  ]);
+  await writeAudit(env, user.id, "sighting.deleted", "sighting", sightingId);
+  return json({ status: "deleted", sightingId });
 }
 
 async function createCareFlag(request, env) {
@@ -463,6 +486,7 @@ async function api(request, env, url) {
   }
   if (url.pathname === "/api/sightings" && request.method === "GET") return json({ sightings: await getSightings(request, env) });
   if (url.pathname === "/api/sightings" && request.method === "POST") return createSighting(request, env);
+  if (url.pathname.startsWith("/api/sightings/") && request.method === "DELETE") return deleteSighting(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/journal" && request.method === "GET") return getJournal(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "GET") return getCareFlags(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "POST") return createCareFlag(request, env);

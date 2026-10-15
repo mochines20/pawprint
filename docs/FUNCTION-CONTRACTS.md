@@ -67,6 +67,7 @@ submitSighting(input: {
   capturedAt: ISODateTime;
   latitude: number;
   longitude: number;
+  description: string; // 8–280 characters, written before publish
   visibility?: Visibility;
   idempotencyKey: string;
 }): Promise<{
@@ -85,6 +86,23 @@ Rules:
 - Set `expiresAt = uploadedAtUtc + 24 hours`; never calculate expiry from the user's local date.
 - Do not award XP, rarity, badges, or streak credit before validation is accepted.
 - Publish only after the configured delay and only if the sighting is not private.
+- The default public-map delay is 5 minutes; public eligibility ends 24 hours after upload.
+- Store the description with the sighting and show it in the map detail popup without exposing precise GPS.
+
+### `deleteSighting`
+
+```ts
+deleteSighting(input: { userId: UUID; sightingId: UUID }): Promise<{
+  status: "deleted";
+  sightingId: UUID;
+}>;
+```
+
+Rules:
+
+- Only the sighting owner may delete it.
+- Remove the public map eligibility immediately and delete the stored capture plus derived reward/journal links.
+- Write an audit event; deletion must be safe to retry when the sighting is already absent.
 
 ### `validateSightingImage`
 
