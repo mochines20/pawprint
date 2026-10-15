@@ -1,11 +1,10 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
-
 const nativeFetch = window.fetch.bind(window);
 const authReady = Promise.resolve().then(async () => {
   const response = await nativeFetch("/api/auth/config", { headers: { accept: "application/json" } });
   if (!response.ok) throw new Error("AUTH_CONFIG_UNAVAILABLE");
   const config = await response.json();
   if (!config.enabled || !config.url || !config.anonKey) return { client: null, config };
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.4");
   return { client: createClient(config.url, config.anonKey, { auth: { flowType: "pkce", detectSessionInUrl: false } }), config };
 });
 
@@ -23,7 +22,7 @@ function addStyles() {
   if (document.getElementById("pawprint-auth-styles")) return;
   const style = document.createElement("style");
   style.id = "pawprint-auth-styles";
-  style.textContent = styles;
+  style.textContent = styles + authEnhancements;
   document.head.appendChild(style);
 }
 
@@ -31,6 +30,19 @@ let client = null;
 let authConfig = null;
 let modal = null;
 let statusNode = null;
+window.pawprintAuthGate = window.pawprintAuthGate || { ready: false, queue: [] };
+window.pawprintOpenAuth = (accountMode = "login") => openAuth("auth", accountMode);
+
+function releaseAuthGate() {
+  if (window.pawprintAuthGate.ready) return;
+  window.pawprintAuthGate.ready = true;
+  const queued = window.pawprintAuthGate.queue.splice(0);
+  queued.forEach((callback) => callback());
+}
+
+const authEnhancements = `
+.auth-password-wrap{position:relative;display:flex;align-items:center}.auth-password-wrap input{padding-right:70px}.auth-password-toggle{position:absolute;right:8px;min-height:32px;padding:0 9px;border:1px solid #dedfe2;border-radius:9px;background:#f7f7f8;color:#555960;font:inherit;font-size:.7rem;font-weight:850;cursor:pointer}.auth-password-toggle:hover{background:#fff;color:#171717}.auth-mode-links{display:flex;justify-content:space-between;gap:12px;margin-top:14px;color:#85888e;font-size:.74rem}.auth-link{padding:0;border:0;background:transparent;color:#6e4b00;font:inherit;font-weight:850;text-decoration:underline;text-underline-offset:3px;cursor:pointer}.auth-link:hover{color:#171717}
+`;
 
 function setStatus(message, kind = "") {
   if (!statusNode) return;
@@ -38,19 +50,45 @@ function setStatus(message, kind = "") {
   statusNode.dataset.kind = kind;
 }
 
-function authMarkup() {
+function authMarkup(accountMode = "login") {
   const configured = Boolean(client);
-  return `<button class="auth-close" type="button" data-close-auth aria-label="Close sign in">×</button>
-    <p class="auth-kicker">Private by default</p><h2>Sign in to Pawprint.</h2>
-    <p>Use a magic link. No password to remember, and your provider profile is not copied into your Pawprint profile.</p>
-    <form class="auth-form" id="pawprintMagicLinkForm">
+  if (accountMode === "reset") return `<button class="auth-close" type="button" data-close-auth aria-label="Close password reset">×</button>
+    <p class="auth-kicker">Private by default</p><h2>Reset your password.</h2>
+    <p>Supabase will send a secure reset link. Pawprint never stores your password.</p>
+    <form class="auth-form" id="pawprintResetForm">
       <label for="pawprintAuthEmail">Email address<input id="pawprintAuthEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+      <button class="auth-submit" type="submit" ${configured ? "" : "disabled"}>Send reset link</button>
+    </form>
+    <div class="auth-mode-links"><span>Remembered it?</span><button class="auth-link" type="button" data-auth-view="login">Back to log in</button></div>
+    <p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite">${configured ? "" : "Supabase Auth is not configured for this preview yet."}</p>`;
+  if (accountMode === "reset-confirm") return `<button class="auth-close" type="button" data-close-auth aria-label="Close password reset">×</button>
+    <p class="auth-kicker">One secure step</p><h2>Choose a new password.</h2>
+    <p>Use at least 8 characters. Your password stays with Supabase Auth.</p>
+    <form class="auth-form" id="pawprintResetConfirmForm">
+      <label for="pawprintNewPassword">New password<div class="auth-password-wrap"><input id="pawprintNewPassword" name="password" type="password" minlength="8" autocomplete="new-password" required><button class="auth-password-toggle" type="button" data-toggle-password data-target="pawprintNewPassword" aria-label="View password">View</button></div></label>
+      <label for="pawprintConfirmPassword">Confirm password<div class="auth-password-wrap"><input id="pawprintConfirmPassword" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required><button class="auth-password-toggle" type="button" data-toggle-password data-target="pawprintConfirmPassword" aria-label="View password">View</button></div></label>
+      <button class="auth-submit" type="submit" ${configured ? "" : "disabled"}>Update password</button>
+    </form><p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite">${configured ? "" : "Supabase Auth is not configured for this preview yet."}</p>`;
+  const isSignup = accountMode === "signup";
+  return `<button class="auth-close" type="button" data-close-auth aria-label="Close sign in">×</button>
+    <p class="auth-kicker">Private by default</p><h2>${isSignup ? "Create your Pawprint account." : "Sign in to Pawprint."}</h2>
+    <p>${isSignup ? "Create an account with Supabase Auth to use the browser app and keep your Journal safe." : "Sign in before entering the browser app. Use a password, magic link, or a connected provider."}</p>
+    <form class="auth-form" id="pawprintPasswordForm" data-auth-mode="${isSignup ? "signup" : "login"}">
+      <label for="pawprintAuthEmail">Email address<input id="pawprintAuthEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+      <label for="pawprintAuthPassword">Password<div class="auth-password-wrap"><input id="pawprintAuthPassword" name="password" type="password" minlength="8" autocomplete="${isSignup ? "new-password" : "current-password"}" required><button class="auth-password-toggle" type="button" data-toggle-password data-target="pawprintAuthPassword" aria-label="View password">View</button></div></label>
+      ${isSignup ? `<label for="pawprintConfirmPassword">Confirm password<div class="auth-password-wrap"><input id="pawprintConfirmPassword" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required><button class="auth-password-toggle" type="button" data-toggle-password data-target="pawprintConfirmPassword" aria-label="View password">View</button></div></label>` : ""}
+      <button class="auth-submit" type="submit" ${configured ? "" : "disabled"}>${isSignup ? "Create account" : "Log in"}</button>
+    </form>
+    <div class="auth-mode-links"><span>${isSignup ? "Already have an account?" : "New to Pawprint?"} <button class="auth-link" type="button" data-auth-view="${isSignup ? "login" : "signup"}">${isSignup ? "Log in" : "Sign up"}</button></span>${isSignup ? "" : `<button class="auth-link" type="button" data-auth-view="reset">Forgot password?</button>`}</div>
+    <div class="auth-divider"><span>or continue with</span></div>
+    <form class="auth-form" id="pawprintMagicLinkForm" style="margin-top:0">
+      <input id="pawprintMagicLinkEmail" name="email" type="email" autocomplete="email" placeholder="Email for a magic link" aria-label="Email for a magic link" required>
       <button class="auth-submit" type="submit" ${configured ? "" : "disabled"}>Send magic link</button>
     </form>
     <div class="auth-divider"><span>or continue with</span></div>
     <div class="auth-socials"><button class="auth-social" type="button" data-auth-provider="google" ${configured ? "" : "disabled"}>Google</button><button class="auth-social" type="button" data-auth-provider="apple" ${configured ? "" : "disabled"}>Apple</button></div>
     <p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite">${configured ? "" : "Supabase Auth is not configured for this preview yet."}</p>
-    <p class="auth-note">Pawprint stores only your chosen nickname, avatar, and age group in your public profile. Email stays with Supabase Auth.</p>`;
+    <p class="auth-note">Pawprint stores only your chosen nickname, avatar, and age group in your public profile. Email and passwords stay with Supabase Auth.</p>`;
 }
 
 function onboardingMarkup() {
@@ -66,17 +104,23 @@ function onboardingMarkup() {
     </form><p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite"></p>`;
 }
 
-function openAuth(mode = "auth") {
+function openAuth(mode = "auth", accountMode = "login") {
   if (!modal) return;
-  modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup()}</div>`;
+  modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup(accountMode)}</div>`;
   modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
   modal.dataset.mode = mode;
+  modal.dataset.accountMode = accountMode;
   statusNode = modal.querySelector("#pawprintAuthStatus");
   if (mode === "onboarding") modal.querySelector("#pawprintNickname")?.focus();
   else modal.querySelector("#pawprintAuthEmail")?.focus();
 }
 
-function closeAuth() { modal?.classList.remove("is-open"); }
+function closeAuth() {
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+}
 
 function addTriggers() {
   const buttons = document.querySelectorAll(".app-header-actions, .nav-actions");
@@ -128,6 +172,56 @@ async function handleMagicLink(event) {
   event.currentTarget.reset();
 }
 
+async function handlePassword(event) {
+  event.preventDefault();
+  if (!client) return setStatus("Supabase Auth is not configured for this preview yet.", "error");
+  const form = event.currentTarget;
+  const values = new FormData(form);
+  const email = String(values.get("email") || "").trim();
+  const password = String(values.get("password") || "");
+  const confirmPassword = String(values.get("confirmPassword") || "");
+  const submit = form.querySelector("button[type=submit]");
+  if (form.dataset.authMode === "signup" && password !== confirmPassword) return setStatus("Passwords do not match.", "error");
+  submit.disabled = true;
+  try {
+    const result = form.dataset.authMode === "signup"
+      ? await client.auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/auth/callback` } })
+      : await client.auth.signInWithPassword({ email, password });
+    if (result.error) return setStatus(result.error.message, "error");
+    if (form.dataset.authMode === "signup" && !result.data.session) {
+      setStatus("Account created. Check your email to confirm, then return to Pawprint.", "success");
+      form.reset();
+    } else {
+      setStatus("Signed in. Opening your Pawprint…", "success");
+      closeAuth();
+    }
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function handleReset(event) {
+  event.preventDefault();
+  if (!client) return setStatus("Supabase Auth is not configured for this preview yet.", "error");
+  const email = String(new FormData(event.currentTarget).get("email") || "").trim();
+  const result = await client.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/auth/callback?next=reset` });
+  if (result.error) return setStatus(result.error.message, "error");
+  setStatus("Reset link sent. Check your inbox, then choose a new password.", "success");
+  event.currentTarget.reset();
+}
+
+async function handleResetConfirm(event) {
+  event.preventDefault();
+  if (!client) return setStatus("Supabase Auth is not configured for this preview yet.", "error");
+  const values = new FormData(event.currentTarget);
+  const password = String(values.get("password") || "");
+  if (password !== String(values.get("confirmPassword") || "")) return setStatus("Passwords do not match.", "error");
+  const result = await client.auth.updateUser({ password });
+  if (result.error) return setStatus(result.error.message, "error");
+  closeAuth();
+  window.notify?.("Password updated. Welcome back to Pawprint.");
+}
+
 async function handleProvider(provider) {
   if (!client) return setStatus("Supabase Auth is not configured for this preview yet.", "error");
   const result = await client.auth.signInWithOAuth({ provider, options: { redirectTo: `${location.origin}/auth/callback` } });
@@ -160,24 +254,53 @@ async function handleSignOut() {
 function bindModal() {
   modal.addEventListener("click", async (event) => {
     if (event.target === modal || event.target.closest("[data-close-auth]")) return closeAuth();
+    const view = event.target.closest("[data-auth-view]")?.dataset.authView;
+    if (view) return openAuth("auth", view);
+    const passwordToggle = event.target.closest("[data-toggle-password]");
+    if (passwordToggle) {
+      const input = modal.querySelector(`#${passwordToggle.dataset.target}`);
+      if (!input) return;
+      const visible = input.type === "text";
+      input.type = visible ? "password" : "text";
+      passwordToggle.textContent = visible ? "View" : "Hide";
+      passwordToggle.setAttribute("aria-label", visible ? "View password" : "Hide password");
+      return;
+    }
     const provider = event.target.closest("[data-auth-provider]")?.dataset.authProvider;
     if (provider) return handleProvider(provider);
     if (event.target.closest("[data-open-auth]") && window.pawprintSession) return handleSignOut();
   });
   modal.addEventListener("submit", (event) => {
     if (event.target.id === "pawprintMagicLinkForm") handleMagicLink(event);
+    if (event.target.id === "pawprintPasswordForm") handlePassword(event);
+    if (event.target.id === "pawprintResetForm") handleReset(event);
+    if (event.target.id === "pawprintResetConfirmForm") handleResetConfirm(event);
     if (event.target.id === "pawprintOnboardingForm") handleOnboarding(event);
   });
 }
 
 function bindDocumentTriggers() {
   document.addEventListener("click", (event) => {
+    const appTrigger = event.target.closest("[data-open-app]");
+    if (appTrigger && !window.pawprintSession) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openAuth("auth", "login");
+      return;
+    }
     const trigger = event.target.closest("[data-open-auth]");
     if (!trigger) return;
     event.preventDefault();
     if (window.pawprintSession) return handleSignOut();
-    openAuth("auth");
-  });
+    openAuth("auth", "login");
+  }, true);
+}
+
+function protectAppRoute() {
+  if (location.hash !== "#app" || window.pawprintSession) return;
+  document.body.classList.remove("is-app");
+  history.replaceState({}, "", `${location.pathname}${location.search}#top`);
+  openAuth("auth", "login");
 }
 
 async function init() {
@@ -203,22 +326,33 @@ async function init() {
     headers.set("Authorization", `Bearer ${window.pawprintSession.access_token}`);
     return originalFetch(input, { ...init, headers });
   };
-  if (!client) return updateTriggers();
-  const callbackCode = new URLSearchParams(location.search).get("code");
+  if (!client) {
+    updateTriggers();
+    protectAppRoute();
+    releaseAuthGate();
+    return;
+  }
+  const callbackParams = new URLSearchParams(location.search);
+  const callbackCode = callbackParams.get("code");
+  const recoveryCallback = callbackParams.get("next") === "reset";
   if (location.pathname === "/auth/callback" && callbackCode) {
     const exchange = await client.auth.exchangeCodeForSession(callbackCode);
-    if (exchange.error) openAuth("auth");
+    if (exchange.error) openAuth("auth", "login");
     history.replaceState({}, "", "/#app");
   }
   const sessionResult = await client.auth.getSession();
   window.pawprintSession = sessionResult.data.session;
   updateTriggers();
-  if (window.pawprintSession) finishOnboarding();
+  if (recoveryCallback) openAuth("auth", "reset-confirm");
+  else if (window.pawprintSession) finishOnboarding();
+  else protectAppRoute();
   client.auth.onAuthStateChange((_event, session) => {
     window.pawprintSession = session;
     updateTriggers();
-    if (session) finishOnboarding();
+    if (_event === "PASSWORD_RECOVERY") openAuth("auth", "reset-confirm");
+    else if (session) finishOnboarding();
   });
+  releaseAuthGate();
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });

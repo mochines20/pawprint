@@ -13,7 +13,7 @@ The `/api/auth/config` endpoint exposes only these two public values. Until they
 
 ## Providers and redirects
 
-In Supabase Authentication settings, configure Magic Link, Google, and Apple as needed. Add only real app domains to the Supabase URL Configuration allow-list:
+In Supabase Authentication settings, enable Email provider for password sign-up/login and password reset. Configure Magic Link, Google, and Apple as needed. Add only real app domains to the Supabase URL Configuration allow-list:
 
 - `https://pawprint.madison88-0851.chatgpt.site/auth/callback`
 - `http://localhost:4173/auth/callback` for local testing only
@@ -29,7 +29,11 @@ Run [`supabase-auth.sql`](./supabase-auth.sql) in the Supabase SQL Editor. The t
 1. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 2. Run the profile migration.
 3. Add the local and production callback URLs.
-4. Open the app, choose Sign in, and request a magic link.
+4. Open the app, choose Sign in, and verify that the browser-app gate appears before the dashboard.
+5. Test email/password sign-up, email confirmation, password login, the View/Hide password control, and Forgot password → reset link → new password.
+6. Test the magic link, Google, and Apple options when those providers are enabled.
+
+The product never stores passwords in Pawprint tables. Supabase Auth owns password hashing, sessions, tokens, email confirmation, and recovery links. Pawprint stores only the user-selected nickname, avatar, and age group in `profiles` after onboarding.
 5. Open the link, complete onboarding, refresh, and confirm the session remains.
 6. Sign out and confirm protected API actions ask for sign-in.
 7. Enable Google/Apple one at a time and verify each callback on the real domain.
