@@ -113,6 +113,31 @@
       .mobile-nav{grid-column:1/-1}
     }
     .app-map:after{content:"PHILIPPINES · APPROXIMATE PAWPRINTS"}
+    /* Brand palette: black + orange, with neutral white/gray surfaces for legibility. */
+    :root{--care:#d97706}
+    .care-banner{background:#fff4d6;color:#7a4a00}
+    .care-banner b{color:#7a4a00}
+    .status-pill{background:#fff1c9;color:#7a4a00}
+    .live-pin.emergency{background:var(--amber);box-shadow:0 0 0 0 rgba(255,184,21,.62)}
+    .care-mark{background:var(--amber);box-shadow:0 0 0 0 rgba(255,184,21,.5)}
+    .care-option .care-symbol{background:#fff4d6;color:#b96800}
+    .app-map{background:linear-gradient(145deg,#c8c9cc 0%,#e4e4e3 25%,#b6b8ba 52%,#d4d4d2 74%,#a5a6a8 100%)}
+    .app-map:before{background:radial-gradient(ellipse at 20% 30%,rgba(255,255,255,.34) 0 8%,transparent 9%),radial-gradient(ellipse at 74% 18%,rgba(70,70,70,.18) 0 13%,transparent 14%),radial-gradient(ellipse at 36% 78%,rgba(95,95,95,.16) 0 16%,transparent 17%),linear-gradient(28deg,transparent 40%,rgba(255,255,255,.24) 41% 42%,transparent 43%),linear-gradient(157deg,transparent 47%,rgba(55,55,55,.16) 48% 52%,transparent 53%)}
+    .map-info .emergency-copy{color:#8a4c00}
+    .danger-zone{border-color:#e7b451;background:#fff8e7}
+    .danger-zone strong{color:#8a4c00}
+    [id="deleteAccount"]{color:#8a4c00!important;border-color:#e7b451!important}
+    @keyframes emergencyPulse{0%{box-shadow:0 0 0 0 rgba(255,184,21,.62)}70%{box-shadow:0 0 0 13px rgba(255,184,21,0)}100%{box-shadow:0 0 0 0 rgba(255,184,21,0)}}
+    @media(max-width:600px){
+      .progress-card{background:#ffb815;border-color:#ffb815}
+      .progress-card .progress-line{color:#6b4500}
+      .progress-card .progress-line b{color:var(--ink)}
+      .progress-card small{color:#6b4500!important}
+      .app-card:not(.map-card):not(.metric-card):not(.progress-card):last-child{background:#fff1c9;border-color:#e6af27}
+      .app-card:not(.map-card):not(.metric-card):not(.progress-card):last-child .progress-line{color:#6b4500}
+      .care-banner{background:#fff4d6;color:#7a4a00}
+      .care-banner b{color:#7a4a00}
+    }
   </style>
 </head>
 <body>
