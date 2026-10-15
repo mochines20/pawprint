@@ -115,6 +115,17 @@
     .app-map:after{content:"PHILIPPINES · APPROXIMATE PAWPRINTS"}
     .is-app .app-header-actions{display:none}
     .app-map .map-empty{position:absolute;inset:50% auto auto 50%;z-index:4;width:max-content;max-width:calc(100% - 34px);padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.9);color:#777b82;font-size:.64rem;font-weight:900;letter-spacing:.04em;transform:translate(-50%,-50%);text-align:center}
+    .app-map.live-map{background:#e6e7e9}
+    .app-map.live-map:before,.app-map.live-map:after{display:none}
+    .app-map.live-map .maplibregl-canvas{display:block}
+    .app-map.live-map .maplibregl-ctrl-group{border:1px solid rgba(23,23,23,.12);border-radius:12px;overflow:hidden;box-shadow:0 5px 16px rgba(23,23,23,.12)}
+    .app-map.live-map .maplibregl-ctrl button{width:31px;height:31px}
+    .map-pin{display:grid;place-items:center;width:31px;height:31px;padding:0;border:2px solid var(--ink);border-radius:50% 50% 50% 4px;background:var(--amber);box-shadow:0 4px 9px rgba(23,23,23,.2);transform:rotate(-45deg);cursor:pointer}
+    .map-pin i{width:7px;height:7px;border-radius:50%;background:var(--ink);transform:rotate(45deg)}
+    .map-pin.emergency{animation:emergencyPulse 1.55s infinite}
+    .map-pin.emergency i{background:#fff}
+    .pawprint-popup{display:grid;gap:4px;min-width:150px;padding:2px 0;color:var(--ink)}
+    .pawprint-popup strong{font-size:.82rem}.pawprint-popup small{color:#777b82;font-size:.68rem}.pawprint-popup .popup-emergency{color:#8a4c00;font-weight:900}
     /* Brand palette: black + orange, with neutral white/gray surfaces for legibility. */
     :root{--care:#d97706}
     .care-banner{background:#fff4d6;color:#7a4a00}
@@ -141,6 +152,7 @@
       .care-banner b{color:#7a4a00}
     }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -297,6 +309,19 @@
       if(dashboard)new MutationObserver(()=>{refreshActualCare()}).observe(dashboard,{childList:true,subtree:true});
       refreshHomeJournal();refreshActualCare();
     })();
+  </script>
+  <script type="module">
+    import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
+    const mapStyle='https://tiles.openfreemap.org/styles/bright';
+    let mapInstance=null,mapContainer=null,mapMarkers=[];
+    const escapeMapText=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+    const clearMapMarkers=()=>{mapMarkers.forEach(marker=>marker.remove());mapMarkers=[];};
+    const mapPopup=item=>{const wrapper=document.createElement('div');wrapper.className='pawprint-popup';const title=document.createElement('strong');title.textContent=item.emergency?'Emergency Care Flag':(item.catType||'Verified pawprint');const area=document.createElement('small');area.textContent='Approximate public area · exact location hidden';const captured=document.createElement('small');captured.textContent=`Captured ${new Date(item.capturedAt).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}`;wrapper.append(title,area,captured);if(item.emergency){const alert=document.createElement('small');alert.className='popup-emergency';alert.textContent='Community care review requested';wrapper.append(alert);}return wrapper;};
+    const renderMapMarkers=sightings=>{if(!mapInstance)return;clearMapMarkers();const map=mapContainer;map.querySelector('.map-empty')?.remove();if(!sightings.length){const empty=document.createElement('span');empty.className='map-empty';empty.textContent='No public pawprints nearby yet';map.appendChild(empty);return;}sightings.slice(0,60).forEach(item=>{const markerElement=document.createElement('button');markerElement.type='button';markerElement.className=`map-pin${item.emergency?' emergency':''}`;markerElement.title=item.emergency?'Emergency Care Flag':'Verified pawprint';markerElement.setAttribute('aria-label',markerElement.title);markerElement.innerHTML='<i></i>';const marker=new maplibregl.Marker({element:markerElement,anchor:'center'}).setLngLat([item.area.longitude,item.area.latitude]).setPopup(new maplibregl.Popup({offset:18,closeButton:true}).setDOMContent(mapPopup(item))).addTo(mapInstance);mapMarkers.push(marker);});};
+    const initActualMap=async sightings=>{const nextContainer=document.querySelector('.app-map');if(!nextContainer)return;const changedContainer=mapContainer!==nextContainer;if(changedContainer){mapInstance?.remove();mapInstance=null;mapContainer=nextContainer;mapContainer.classList.add('live-map');mapContainer.querySelectorAll('.mini-pin').forEach(pin=>pin.remove());mapInstance=new maplibregl.Map({container:mapContainer,style:mapStyle,center:[120.9842,14.5995],zoom:5.4,minZoom:4,maxZoom:18,attributionControl:false,dragRotate:false,touchPitch:false});mapInstance.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');mapInstance.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');mapInstance.on('load',()=>renderMapMarkers(window.pawprintMapSightings||[]));}window.pawprintMapSightings=sightings;if(mapInstance?.loaded())renderMapMarkers(sightings);};
+    window.renderLiveMap=sightings=>{initActualMap(sightings||[]).catch(()=>{const map=document.querySelector('.app-map');if(map){map.classList.remove('live-map');}});};
+    const currentLoadDashboard=window.loadDashboard;if(currentLoadDashboard)window.loadDashboard=async()=>{const data=await currentLoadDashboard();try{const response=await fetch('/api/sightings',{credentials:'include'});const result=await response.json();window.renderLiveMap(result.sightings||[]);}catch{window.renderLiveMap([]);}return data;};
+    if(document.body.classList.contains('is-app'))window.loadDashboard?.();
   </script>
 </body>
 </html>
