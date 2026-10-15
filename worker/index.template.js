@@ -1,4 +1,6 @@
 const APP_HTML = __PAWPRINT_HTML__;
+const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [] });
+const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v1'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -81,6 +83,76 @@ async function ensureRuntimeTables(env) {
   ]);
   // Keep existing installations compatible with the richer capture flow.
   try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN description TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE users ADD COLUMN age_group TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN barangay_name TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN city_name TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN country_name TEXT NOT NULL DEFAULT 'Philippines'").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_confidence REAL").run(); } catch { /* column already exists */ }
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), type TEXT NOT NULL,
+      title TEXT NOT NULL, body TEXT NOT NULL, read_at TEXT, created_at TEXT NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_badges (
+      user_id TEXT NOT NULL REFERENCES users(id), badge_id TEXT NOT NULL, earned_at TEXT NOT NULL,
+      PRIMARY KEY(user_id, badge_id)
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS quests (
+      id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL,
+      target INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS quest_progress (
+      user_id TEXT NOT NULL REFERENCES users(id), quest_id TEXT NOT NULL REFERENCES quests(id),
+      count INTEGER NOT NULL DEFAULT 0, completed_at TEXT, updated_at TEXT NOT NULL,
+      PRIMARY KEY(user_id, quest_id)
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS community_assets (
+      id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, description TEXT,
+      latitude REAL, longitude REAL, public_geohash TEXT, area_name TEXT, contact TEXT,
+      verified INTEGER NOT NULL DEFAULT 0, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS rescue_requests (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), sighting_id TEXT,
+      need TEXT NOT NULL, note TEXT, public_geohash TEXT, status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL, resolved_at TEXT
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS moderation_queue (
+      id TEXT PRIMARY KEY, target_type TEXT NOT NULL, target_id TEXT NOT NULL, reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open', assigned_to TEXT, action TEXT, created_at TEXT NOT NULL, resolved_at TEXT
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS partner_reports (
+      id TEXT PRIMARY KEY, partner_name TEXT NOT NULL, period_start TEXT NOT NULL, period_end TEXT NOT NULL,
+      payload_json TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS community_assets_kind_idx ON community_assets (kind, created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS rescue_status_idx ON rescue_requests (status, created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS moderation_status_idx ON moderation_queue (status, created_at DESC)"),
+  ]);
+  const today = localDay("UTC");
+  const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString();
+  await env.DB.prepare(`INSERT OR IGNORE INTO quests (id,slug,title,description,target,kind,starts_at,ends_at) VALUES (?,?,?,?,?,?,?)`)
+    .bind("quest-daily-pawprint", "daily-pawprint", "Daily Pawprint", "Log one safe cat sighting today.", 1, "sighting", `${today}T00:00:00.000Z`, weekEnd).run();
+}
+
+const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Super Rare"];
+function rarityFor(catType, total = 0) {
+  const normalized = String(catType || "").toLowerCase();
+  if (normalized.includes("calico") || normalized.includes("tortoiseshell")) return "Rare";
+  if (normalized.includes("black") || normalized.includes("white")) return total < 10 ? "Super Rare" : "Rare";
+  if (normalized.includes("tuxedo") || normalized.includes("gray")) return "Uncommon";
+  return "Common";
+}
+function levelFor(xp) { return Math.max(1, Math.floor(Math.sqrt(Math.max(0, Number(xp || 0)) / 100)) + 1); }
+function isAdmin(request, env) {
+  const user = userFrom(request);
+  const configured = String(env.ADMIN_USER_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
+  return Boolean(user && configured.includes(user.id));
+}
+async function createNotification(env, userId, type, title, body) {
+  await env.DB.prepare("INSERT INTO notifications (id,user_id,type,title,body,created_at) VALUES (?,?,?,?,?,?)")
+    .bind(id(), userId, type, title, body, now()).run();
 }
 
 function encodeGeohash(latitude, longitude, precision = 6) {
@@ -227,6 +299,7 @@ async function getSightings(request, env) {
   return rows.results.map((row) => ({
     id: row.id,
     catType: row.cat_type,
+    rarity: rarityFor(row.cat_type),
     description: row.description || "",
     photoUrl: row.visibility === "public" ? `/api/sightings/${row.id}/photo` : null,
     area: geohashCenter(row.public_geohash),
@@ -370,20 +443,22 @@ async function updateProfile(request, env) {
   const user = await requireUser(request, env);
   const body = await request.json();
   const displayName = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 80) : null;
+  const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim().slice(0, 500) : null;
+  const ageGroup = ["13_17", "18_24", "25_34", "35_44", "45_plus", "prefer_not_to_say"].includes(body.ageGroup) ? body.ageGroup : null;
   const timeZone = typeof body.timeZone === "string" && body.timeZone.length <= 80 ? body.timeZone : "Asia/Manila";
   const language = ["en", "fil", "es", "ja"].includes(body.language) ? body.language : "en";
   const defaultVisibility = ["public", "friends", "private"].includes(body.defaultVisibility) ? body.defaultVisibility : "friends";
   const notificationPreference = ["included", "important", "off"].includes(body.notificationPreference) ? body.notificationPreference : "included";
   await env.DB.prepare(
-    `UPDATE users SET display_name=COALESCE(?, display_name), time_zone=?, language=?, updated_at=? WHERE id=?`,
-  ).bind(displayName, timeZone, language, now(), user.id).run();
+    `UPDATE users SET display_name=COALESCE(?, display_name), avatar_url=COALESCE(?, avatar_url), age_group=COALESCE(?, age_group), time_zone=?, language=?, updated_at=? WHERE id=?`,
+  ).bind(displayName, avatarUrl, ageGroup, timeZone, language, now(), user.id).run();
   await env.DB.prepare(
     `INSERT INTO user_settings (user_id,default_visibility,show_age_group,allow_friend_requests,notification_preference,updated_at)
      VALUES (?,?,?,?,?,?)
      ON CONFLICT(user_id) DO UPDATE SET default_visibility=excluded.default_visibility,notification_preference=excluded.notification_preference,updated_at=excluded.updated_at`,
   ).bind(user.id, defaultVisibility, body.showAgeGroup ? 1 : 0, body.allowFriendRequests === false ? 0 : 1, notificationPreference, now()).run();
   await writeAudit(env, user.id, "profile.updated", "user", user.id, { timeZone, language });
-  const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.time_zone,users.language,
+   const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.time_zone,users.language,
       user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference
       FROM users LEFT JOIN user_settings ON user_settings.user_id=users.id WHERE users.id=?`).bind(user.id).first();
   return json({ user: profile });
@@ -391,7 +466,7 @@ async function updateProfile(request, env) {
 
 async function getProfile(request, env) {
   const user = await requireUser(request, env);
-  const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.time_zone,users.language,
+  const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.time_zone,users.language,
       user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference
       FROM users LEFT JOIN user_settings ON user_settings.user_id=users.id WHERE users.id=?`).bind(user.id).first();
   return json({ user: profile });
@@ -439,10 +514,15 @@ async function createSighting(request, env) {
       `INSERT INTO journal_entries (id,user_id,sighting_id,cat_type,spotted_at,first_spotted,created_at) VALUES (?,?,?,?,?,?,?)`,
     ).bind(id(), user.id, sightingId, validation.catType, capturedAt, previousCat ? 0 : 1, now()).run();
     streak = await updateStreak(env, user.id, session.device_time_zone || "Asia/Manila", sightingId);
+    const quest = await env.DB.prepare("SELECT id,target FROM quests WHERE slug='daily-pawprint' AND starts_at<=? AND ends_at>? LIMIT 1").bind(now(), now()).first();
+    if (quest) await env.DB.prepare(`INSERT INTO quest_progress (user_id,quest_id,count,completed_at,updated_at) VALUES (?,?,?,?,?)
+      ON CONFLICT(user_id,quest_id) DO UPDATE SET count=MIN(quest_progress.count+1,excluded.count),completed_at=COALESCE(quest_progress.completed_at,excluded.completed_at),updated_at=excluded.updated_at`)
+      .bind(user.id, quest.id, 1, now(), now()).run();
+    await createNotification(env, user.id, "sighting", "Pawprint saved", `Your ${validation.catType || "cat"} sighting earned XP. Public pins appear after 5 minutes and expire after 24 hours.`);
   }
   await env.DB.prepare("UPDATE capture_sessions SET used_at=? WHERE id=? AND user_id=?").bind(now(), captureSessionId, user.id).run();
   await writeAudit(env, user.id, "sighting.created", "sighting", sightingId, { validationStatus: validation.status, visibility });
-  const responseBody = { sightingId, status: validation.status, reason: validation.reason, description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
+  const responseBody = { sightingId, status: validation.status, reason: validation.reason, catType: validation.catType, rarity: rarityFor(validation.catType), description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
   await env.DB.prepare("INSERT INTO request_keys (user_id,request_key,response_json,created_at) VALUES (?,?,?,?)").bind(user.id, idempotencyKey, JSON.stringify(responseBody), now()).run();
   return json(responseBody, 201);
 }
@@ -486,6 +566,7 @@ async function createReport(request, env) {
   if (!allowedTargets.includes(body.targetType) || !body.targetId || !allowedReasons.includes(body.reason)) return json({ error: "INVALID_REPORT" }, 400);
   const reportId = id();
   await env.DB.prepare("INSERT INTO reports (id,user_id,target_type,target_id,reason,note,created_at) VALUES (?,?,?,?,?,?,?)").bind(reportId, user.id, body.targetType, String(body.targetId), body.reason, typeof body.note === "string" ? body.note.slice(0, 500) : null, now()).run();
+  await env.DB.prepare("INSERT INTO moderation_queue (id,target_type,target_id,reason,created_at) VALUES (?,?,?,?,?)").bind(id(), body.targetType, String(body.targetId), body.reason, now()).run();
   await writeAudit(env, user.id, "report.created", body.targetType, body.targetId, { reportId });
   return json({ reportId, status: "open" }, 201);
 }
@@ -539,6 +620,172 @@ async function deleteUser(request, env) {
   return json({ status: "completed" });
 }
 
+async function awardBadges(env, userId, stats) {
+  const badges = [];
+  if (Number(stats.journalTotal || 0) >= 1) badges.push("first-pawprint");
+  if (Number(stats.journalUnique || 0) >= 5) badges.push("alley-scout");
+  if (Number(stats.bestStreak || 0) >= 7) badges.push("week-walker");
+  if (Number(stats.careFlags || 0) >= 1) badges.push("gentle-helper");
+  for (const badgeId of badges) await env.DB.prepare("INSERT OR IGNORE INTO user_badges (user_id,badge_id,earned_at) VALUES (?,?,?)").bind(userId, badgeId, now()).run();
+  return badges;
+}
+
+async function getProgress(request, env) {
+  const user = await requireUser(request, env);
+  const [xp, journal, streak, flags, badges, quests] = await Promise.all([
+    env.DB.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM reward_ledger WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total, SUM(first_spotted) AS unique_count FROM journal_entries WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT current_count,best_count,freeze_count FROM streaks WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM care_flags WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT badge_id,earned_at FROM user_badges WHERE user_id=? ORDER BY earned_at DESC").bind(user.id).all(),
+    env.DB.prepare(`SELECT quests.slug,quests.title,quests.description,quests.target,COALESCE(quest_progress.count,0) AS count,quest_progress.completed_at
+      FROM quests LEFT JOIN quest_progress ON quest_progress.quest_id=quests.id AND quest_progress.user_id=?
+      WHERE quests.ends_at>? ORDER BY quests.ends_at ASC`).bind(user.id, now()).all(),
+  ]);
+  const totalXp = Number(xp?.total || 0);
+  const stats = { journalTotal: Number(journal?.total || 0), journalUnique: Number(journal?.unique_count || 0), bestStreak: Number(streak?.best_count || 0), careFlags: Number(flags?.total || 0) };
+  const earned = await awardBadges(env, user.id, stats);
+  return json({ xp: totalXp, level: levelFor(totalXp), nextLevelXp: Math.pow(levelFor(totalXp), 2) * 100, streak: { current: Number(streak?.current_count || 0), best: Number(streak?.best_count || 0), freezes: Number(streak?.freeze_count || 1) }, badges: [...new Set([...(badges.results || []).map((row) => row.badge_id), ...earned])], quests: quests.results.map((row) => ({ slug: row.slug, title: row.title, description: row.description, target: Number(row.target), count: Number(row.count), completed: Boolean(row.completed_at) })), rarity: { common: "Common", uncommon: "Uncommon", rare: "Rare", superRare: "Super Rare" } });
+}
+
+async function getLeaderboards(request, env) {
+  const scope = ["barangay", "city", "country"].includes(new URL(request.url).searchParams.get("scope")) ? new URL(request.url).searchParams.get("scope") : "country";
+  const rows = await env.DB.prepare(`SELECT users.id,COALESCE(users.display_name,'Pawprint spotter') AS name,
+      COUNT(DISTINCT sightings.id) AS sightings,COALESCE(SUM(reward_ledger.amount),0) AS xp
+      FROM users LEFT JOIN sightings ON sightings.user_id=users.id AND sightings.validation_status='accepted'
+      LEFT JOIN reward_ledger ON reward_ledger.user_id=users.id
+      GROUP BY users.id,users.display_name ORDER BY xp DESC,sightings DESC LIMIT 50`).all();
+  return json({ scope, leaders: rows.results.map((row, index) => ({ rank: index + 1, id: row.id, name: row.name, sightings: Number(row.sightings || 0), xp: Number(row.xp || 0), level: levelFor(row.xp) })) });
+}
+
+async function getNotifications(request, env) {
+  const user = await requireUser(request, env);
+  const rows = await env.DB.prepare("SELECT id,type,title,body,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50").bind(user.id).all();
+  return json({ notifications: rows.results.map((row) => ({ id: row.id, type: row.type, title: row.title, body: row.body, read: Boolean(row.read_at), createdAt: row.created_at })) });
+}
+
+async function markNotification(request, env, notificationId) {
+  const user = await requireUser(request, env);
+  await env.DB.prepare("UPDATE notifications SET read_at=? WHERE id=? AND user_id=?").bind(now(), notificationId, user.id).run();
+  return json({ status: "read", notificationId });
+}
+
+async function getCalendar(request, env) {
+  const user = await requireUser(request, env);
+  const rows = await env.DB.prepare(`SELECT journal_entries.id,journal_entries.cat_type,journal_entries.spotted_at,
+      sightings.expires_at,sightings.city_name,sightings.barangay_name
+      FROM journal_entries JOIN sightings ON sightings.id=journal_entries.sighting_id
+      WHERE journal_entries.user_id=? ORDER BY journal_entries.spotted_at DESC LIMIT 400`).bind(user.id).all();
+  return json({ entries: rows.results.map((row) => ({ id: row.id, catType: row.cat_type || "Unclassified cat", spottedAt: row.spotted_at, area: new Date(row.expires_at) <= new Date() ? (row.barangay_name || row.city_name || "Approximate Philippines area") : "Private until pin expires" })) });
+}
+
+async function getMapData(request, env) {
+  const zoom = Math.max(3, Math.min(18, Number(new URL(request.url).searchParams.get("zoom") || 12)));
+  const sightings = await getSightings(request, env);
+  const precision = zoom < 6 ? 2 : zoom < 9 ? 3 : zoom < 12 ? 4 : 5;
+  const groups = new Map();
+  for (const sighting of sightings) {
+    const key = encodeGeohash(sighting.area.latitude, sighting.area.longitude, precision);
+    const group = groups.get(key) || { id: key, count: 0, emergency: false, area: geohashCenter(key), sample: sighting };
+    group.count += 1; group.emergency ||= sighting.emergency; groups.set(key, group);
+  }
+  return json({ zoom, precision, clusters: [...groups.values()].map(({ sample, ...cluster }) => ({ ...cluster, sample: { id: sample.id, catType: sample.catType, description: sample.description, photoUrl: sample.photoUrl, capturedAt: sample.capturedAt } })) });
+}
+
+async function getCommunity(request, env) {
+  await ensureRuntimeTables(env);
+  const kind = new URL(request.url).searchParams.get("kind");
+  const query = kind && ["feeding_station", "tnr", "adoption"].includes(kind) ? "SELECT id,kind,title,description,public_geohash,area_name,contact,verified,created_at FROM community_assets WHERE kind=? ORDER BY created_at DESC LIMIT 100" : "SELECT id,kind,title,description,public_geohash,area_name,contact,verified,created_at FROM community_assets ORDER BY created_at DESC LIMIT 100";
+  const rows = kind && ["feeding_station", "tnr", "adoption"].includes(kind) ? await env.DB.prepare(query).bind(kind).all() : await env.DB.prepare(query).all();
+  return json({ assets: rows.results.map((row) => ({ id: row.id, kind: row.kind, title: row.title, description: row.description, area: row.public_geohash ? geohashCenter(row.public_geohash) : null, areaName: row.area_name || "Approximate area", contact: row.contact, verified: Boolean(row.verified), createdAt: row.created_at })) });
+}
+
+async function createRescueRequest(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const need = String(body.need || "").trim().slice(0, 80);
+  if (!need) return json({ error: "RESCUE_NEED_REQUIRED" }, 400);
+  const sighting = body.sightingId ? await env.DB.prepare("SELECT public_geohash FROM sightings WHERE id=? AND (user_id=? OR visibility='public') LIMIT 1").bind(String(body.sightingId), user.id).first() : null;
+  const requestId = id();
+  await env.DB.prepare("INSERT INTO rescue_requests (id,user_id,sighting_id,need,note,public_geohash,created_at) VALUES (?,?,?,?,?,?,?)").bind(requestId, user.id, body.sightingId || null, need, String(body.note || "").slice(0, 500), sighting?.public_geohash || null, now()).run();
+  await createNotification(env, user.id, "rescue_request", "Rescue request received", "Your request is queued for nearby volunteers and partner shelters.");
+  await writeAudit(env, user.id, "rescue_request.created", "rescue_request", requestId);
+  return json({ requestId, status: "open" }, 201);
+}
+
+async function createCommunityAsset(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const kind = String(body.kind || "");
+  if (!["feeding_station", "tnr", "adoption"].includes(kind) || !String(body.title || "").trim()) return json({ error: "INVALID_COMMUNITY_ASSET" }, 400);
+  const latitude = Number(body.latitude), longitude = Number(body.longitude);
+  const assetId = id();
+  await env.DB.prepare("INSERT INTO community_assets (id,kind,title,description,latitude,longitude,public_geohash,area_name,contact,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(assetId, kind, String(body.title).trim().slice(0, 120), String(body.description || "").slice(0, 500), Number.isFinite(latitude) ? latitude : null, Number.isFinite(longitude) ? longitude : null, Number.isFinite(latitude) && Number.isFinite(longitude) ? encodeGeohash(latitude, longitude, 5) : null, String(body.areaName || "Approximate area").slice(0, 120), String(body.contact || "").slice(0, 160), user.id, now()).run();
+  return json({ assetId, status: "pending_review" }, 201);
+}
+
+async function getWrapped(request, env) {
+  const user = await requireUser(request, env);
+  const [journal, xp, streak, care] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS total,COUNT(DISTINCT cat_type) AS types FROM journal_entries WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM reward_ledger WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT best_count FROM streaks WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM care_flags WHERE user_id=? AND status!='rejected'").bind(user.id).first(),
+  ]);
+  return json({ year: new Date().getUTCFullYear(), stats: { catsSpotted: Number(journal?.total || 0), typesCollected: Number(journal?.types || 0), xp: Number(xp?.total || 0), bestStreak: Number(streak?.best_count || 0), careFlags: Number(care?.total || 0) }, shareText: `My Pawprint Wrapped: ${Number(journal?.total || 0)} cats spotted, ${Number(xp?.total || 0)} XP earned, and ${Number(care?.total || 0)} care signals shared.` });
+}
+
+async function getShareCard(request, env) {
+  const wrapped = await getWrapped(request, env);
+  const payload = await wrapped.json();
+  return json({ card: { ...payload, brand: "Pawprint", tagline: "Spot cats. Leave a safer trace." } });
+}
+
+async function getAdminAnalytics(request, env) {
+  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const [users, sightings, accepted, retention] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS total FROM users").first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM sightings").first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM sightings WHERE validation_status='accepted'").first(),
+    env.DB.prepare("SELECT COUNT(DISTINCT user_id) AS active_users FROM sightings WHERE uploaded_at>=datetime('now','-30 day')").first(),
+  ]);
+  return json({ metrics: { users: Number(users?.total || 0), sightings: Number(sightings?.total || 0), acceptedPhotos: Number(accepted?.total || 0), activeUsers30d: Number(retention?.active_users || 0) }, generatedAt: now() });
+}
+
+async function getModerationQueue(request, env) {
+  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const rows = await env.DB.prepare("SELECT id,target_type,target_id,reason,status,action,created_at,resolved_at FROM moderation_queue WHERE status='open' ORDER BY created_at ASC LIMIT 200").all();
+  return json({ items: rows.results });
+}
+
+async function resolveModeration(request, env, moderationId) {
+  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const action = ["dismiss", "remove", "needs_review"].includes(body.action) ? body.action : "needs_review";
+  await env.DB.prepare("UPDATE moderation_queue SET status=?,action=?,assigned_to=?,resolved_at=? WHERE id=?").bind(action === "needs_review" ? "open" : "resolved", action, user.id, action === "needs_review" ? null : now(), moderationId).run();
+  await writeAudit(env, user.id, "moderation.resolved", "moderation", moderationId, { action });
+  return json({ moderationId, status: action === "needs_review" ? "open" : "resolved", action });
+}
+
+async function getPartnerReports(request, env) {
+  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const rows = await env.DB.prepare("SELECT id,partner_name,period_start,period_end,payload_json,created_at FROM partner_reports ORDER BY created_at DESC LIMIT 100").all();
+  return json({ reports: rows.results.map((row) => ({ ...row, payload: JSON.parse(row.payload_json || "{}") })) });
+}
+
+async function createPartnerReport(request, env) {
+  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  if (!String(body.partnerName || "").trim() || !body.periodStart || !body.periodEnd) return json({ error: "INVALID_PARTNER_REPORT" }, 400);
+  const reportId = id();
+  await env.DB.prepare("INSERT INTO partner_reports (id,partner_name,period_start,period_end,payload_json,created_by,created_at) VALUES (?,?,?,?,?,?,?)")
+    .bind(reportId, String(body.partnerName).trim().slice(0, 120), String(body.periodStart), String(body.periodEnd), JSON.stringify(body.payload || {}), user.id, now()).run();
+  return json({ reportId, status: "created" }, 201);
+}
+
 async function expireSightings(request, env) {
   const secret = env.EXPIRY_JOB_TOKEN;
   const auth = request.headers.get("authorization");
@@ -551,6 +798,23 @@ async function api(request, env, url) {
   if (url.pathname === "/api/health") return json({ ok: true, service: "pawprint", time: now() });
   if (url.pathname === "/api/capture-sessions" && request.method === "POST") return startCaptureSession(request, env);
   if (url.pathname === "/api/dashboard" && request.method === "GET") return getDashboard(request, env);
+  if (url.pathname === "/api/progress" && request.method === "GET") return getProgress(request, env);
+  if (url.pathname === "/api/leaderboards" && request.method === "GET") return getLeaderboards(request, env);
+  if (url.pathname === "/api/notifications" && request.method === "GET") return getNotifications(request, env);
+  if (url.pathname.startsWith("/api/notifications/") && request.method === "PATCH") return markNotification(request, env, url.pathname.split("/").pop());
+  if (url.pathname === "/api/calendar" && request.method === "GET") return getCalendar(request, env);
+  if (url.pathname === "/api/map" && request.method === "GET") return getMapData(request, env);
+  if (url.pathname === "/api/community" && request.method === "GET") return getCommunity(request, env);
+  if (url.pathname === "/api/rescue-requests" && request.method === "POST") return createRescueRequest(request, env);
+  if (url.pathname === "/api/community-assets" && request.method === "GET") return getCommunity(request, env);
+  if (url.pathname === "/api/community-assets" && request.method === "POST") return createCommunityAsset(request, env);
+  if (url.pathname === "/api/wrapped" && request.method === "GET") return getWrapped(request, env);
+  if (url.pathname === "/api/share-card" && request.method === "GET") return getShareCard(request, env);
+  if (url.pathname === "/api/admin/analytics" && request.method === "GET") return getAdminAnalytics(request, env);
+  if (url.pathname === "/api/admin/moderation" && request.method === "GET") return getModerationQueue(request, env);
+  if (url.pathname.startsWith("/api/admin/moderation/") && request.method === "POST") return resolveModeration(request, env, url.pathname.split("/").pop());
+  if (url.pathname === "/api/admin/partner-reports" && request.method === "GET") return getPartnerReports(request, env);
+  if (url.pathname === "/api/admin/partner-reports" && request.method === "POST") return createPartnerReport(request, env);
   if (url.pathname === "/api/me" && request.method === "GET") {
     return getProfile(request, env);
   }
@@ -576,6 +840,8 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname.startsWith("/api/")) return await api(request, env, url);
+      if (request.method === "GET" && url.pathname === "/manifest.webmanifest") return new Response(PWA_MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=3600" } });
+      if (request.method === "GET" && url.pathname === "/sw.js") return new Response(PWA_SERVICE_WORKER, { headers: { "content-type": "application/javascript", "cache-control": "public, max-age=3600" } });
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
     } catch (error) {
