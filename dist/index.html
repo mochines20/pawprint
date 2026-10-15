@@ -185,6 +185,8 @@
   </style>
   <style>
     .app-map:after{content:"PHILIPPINES · LIVE PAWPRINTS"}
+    .app-header:before{display:none!important}
+    .app-header-logo{display:block;flex:0 0 43px;width:43px;height:43px;border-radius:16px}
   </style>
 </head>
 <body>
@@ -205,7 +207,7 @@
             <div class="side-bottom"><b>Browser-first preview</b>iOS and Android are on the roadmap.</div>
           </aside>
           <div class="app-main">
-            <div class="app-header"><div><span class="eyebrow">Philippines · browser preview</span><h1 id="screenTitle">Welcome home</h1></div><div class="app-header-actions"><button class="icon-btn" aria-label="Notifications">♧</button><button class="icon-btn" data-show-landing aria-label="Back to landing">×</button></div></div>
+            <div class="app-header"><span class="brand-mark app-header-logo" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M9 24V7.8c0-1.6 1.4-2.8 3-2.8h8c3.9 0 7 3.1 7 7s-3.1 7-7 7h-5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><circle cx="16" cy="11" r="1.4" fill="currentColor"/><circle cx="21" cy="11" r="1.4" fill="currentColor"/></svg></span><div><span class="eyebrow">Philippines · browser preview</span><h1 id="screenTitle">Welcome home</h1></div><div class="app-header-actions"><button class="icon-btn" aria-label="Notifications">♧</button><button class="icon-btn" data-show-landing aria-label="Back to landing">×</button></div></div>
             <div class="dashboard-grid" id="dashboard">
               <article class="app-card map-card"><div class="map-title">My map · today</div><div class="app-map"><span class="mini-pin a"><i></i></span><span class="mini-pin b"><i></i></span><span class="mini-pin c"><i></i></span></div><div class="app-actions"><button class="btn btn-amber" id="captureBtn">＋ Spot a cat</button><button class="btn btn-light" id="careBtn">⚑ Care flag</button></div></article>
               <article class="app-card metric-card"><div><small>Spotting streak</small><strong id="streakMetric">04</strong><small>days in a row</small></div><div class="tiny-paw">✦</div></article>
