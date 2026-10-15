@@ -113,6 +113,7 @@
       .mobile-nav{grid-column:1/-1}
     }
     .app-map:after{content:"PHILIPPINES · APPROXIMATE PAWPRINTS"}
+    .is-app .app-header-actions{display:none}
     /* Brand palette: black + orange, with neutral white/gray surfaces for legibility. */
     :root{--care:#d97706}
     .care-banner{background:#fff4d6;color:#7a4a00}
@@ -259,6 +260,20 @@
         if(roadmap)roadmap.textContent='The first version is built for cats across the Philippines. The rest should earn its place through real use.';
       };
       scopeCopy();
+    })();
+  </script>
+  <script>
+    (()=>{
+      const addProfileLandingButton=()=>{
+        const dashboard=document.getElementById('dashboard'),actions=document.querySelector('.profile-card:not(.dark) .panel-actions');
+        if(!dashboard||!actions||actions.querySelector('[data-profile-landing]'))return;
+        const button=document.createElement('button');
+        button.type='button';button.className='btn btn-light';button.dataset.profileLanding='';button.textContent='Back to landing';
+        button.addEventListener('click',()=>{document.body.classList.remove('is-app');location.hash='top';scrollTo({top:0,behavior:'smooth'})});
+        actions.appendChild(button);
+      };
+      const dashboard=document.getElementById('dashboard');
+      if(dashboard){new MutationObserver(addProfileLandingButton).observe(dashboard,{childList:true,subtree:true});addProfileLandingButton()}
     })();
   </script>
 </body>
