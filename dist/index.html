@@ -330,6 +330,13 @@
   </script>
     <script>
       (() => {
+        const hydrateAppAfterRefresh=()=>{if(location.hash!=='#app')return;const dashboard=document.getElementById('dashboard');const ready=dashboard?.querySelector('.screen-panel #captureBtn');if(!ready)document.querySelector('[data-screen="home"]')?.click()};
+        window.addEventListener('pageshow',()=>setTimeout(hydrateAppAfterRefresh,0));
+        setTimeout(hydrateAppAfterRefresh,0);
+      })();
+    </script>
+    <script>
+      (() => {
         const modal=document.getElementById('captureModal'),video=document.getElementById('cameraVideo'),canvas=document.getElementById('captureCanvas'),help=document.getElementById('captureHelp'),details=document.getElementById('captureDetails'),description=document.getElementById('sightingDescription'),visibility=document.getElementById('sightingVisibility'),originalButton=document.getElementById('confirmCapture');
         if(!modal||!video||!canvas||!originalButton)return;
         const button=originalButton.cloneNode(true);originalButton.replaceWith(button);
