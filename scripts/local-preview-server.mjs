@@ -24,11 +24,24 @@ function safePath(requestPath) {
   return target.startsWith(`${root}${sep}`) ? target : null;
 }
 
+async function loadLocalEnv() {
+  const envPath = resolve(process.cwd(), ".env.local");
+  if (!existsSync(envPath)) return;
+  const contents = await readFile(envPath, "utf8");
+  for (const line of contents.split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match || match[1].startsWith("#") || process.env[match[1]]) continue;
+    process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+}
+
+await loadLocalEnv();
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (url.pathname === "/api/auth/config") {
-    const supabaseUrl = process.env.PAWPRINT_SUPABASE_URL || "";
-    const supabaseAnonKey = process.env.PAWPRINT_SUPABASE_ANON_KEY || "";
+    const supabaseUrl = process.env.PAWPRINT_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
     response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({
       enabled: Boolean(supabaseUrl && supabaseAnonKey),
