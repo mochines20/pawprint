@@ -102,5 +102,12 @@
       if(body.classList.contains('is-app'))go('home');
     })();
   </script>
+  <script>
+    (()=>{
+      const syncPrivacyToggles=()=>{const profile=window.pawprintProfile||{};const friends=document.querySelector('[data-toggle="friends"]'),reminders=document.querySelector('[data-toggle="reminders"]'),map=document.querySelector('[data-toggle="map"]');if(friends)friends.classList.toggle('on',profile.allow_friend_requests!==0);if(reminders)reminders.classList.toggle('on',profile.notification_preference!=='off');if(map)map.classList.add('on')};
+      const savePrivacySetting=async button=>{const setting=button.dataset.toggle,enabled=button.classList.contains('on');if(setting==='map'){button.classList.add('on');return notify('Approximate map protection stays on for every public pin.')}const payload=setting==='friends'?{allowFriendRequests:enabled}:{notificationPreference:enabled?'included':'off'};try{const data=await api('/api/profile',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});window.pawprintProfile=data.user;syncPrivacyToggles();notify('Privacy setting saved.')}catch(error){button.classList.toggle('on');notify(error.message==='AUTH_REQUIRED'?'Sign in to save privacy settings.':'Privacy setting could not be saved yet.')}};
+      document.addEventListener('click',event=>{const button=event.target.closest('[data-toggle]');if(button)savePrivacySetting(button)});const dashboard=document.getElementById('dashboard');if(dashboard)new MutationObserver(syncPrivacyToggles).observe(dashboard,{childList:true});syncPrivacyToggles();
+    })();
+  </script>
 </body>
 </html>
