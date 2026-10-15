@@ -872,6 +872,7 @@ async function api(request, env, url) {
   if (url.pathname.startsWith("/api/sightings/") && request.method === "DELETE") return deleteSighting(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/journal" && request.method === "GET") return getJournal(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "GET") return getCareFlags(request, env);
+  if (url.pathname === "/api/profile" && request.method === "GET") return getProfile(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "POST") return createCareFlag(request, env);
   if (url.pathname === "/api/profile" && request.method === "PATCH") return updateProfile(request, env);
   if (url.pathname === "/api/reports" && request.method === "POST") return createReport(request, env);
