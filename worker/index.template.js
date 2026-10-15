@@ -4,6 +4,7 @@ const SNEAK_PEEK_SVG = __PAWPRINT_SNEAK_PEEK_SVG__;
 const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
 const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
 const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
+const SUPABASE_AUTH_JS = __PAWPRINT_SUPABASE_AUTH_JS__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v2'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
@@ -33,8 +34,31 @@ function userFrom(request) {
   };
 }
 
+async function supabaseUserFrom(request, env) {
+  const authorization = request.headers.get("authorization") || "";
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+  const supabaseUrl = String(env.SUPABASE_URL || "").replace(/\/$/, "");
+  const anonKey = String(env.SUPABASE_ANON_KEY || "");
+  if (!token || !supabaseUrl || !anonKey) return null;
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => null);
+  if (!data?.id) return null;
+  return { id: data.id, email: data.email || null, name: null, provider: data.app_metadata?.provider || null };
+}
+
+async function authenticatedUser(request, env) {
+  const user = await supabaseUserFrom(request, env);
+  if (user) return user;
+  // Legacy identity is opt-in only, so production cannot silently fall back to a second login system.
+  if (String(env.AUTH_MODE || "").toLowerCase() === "legacy") return userFrom(request);
+  return null;
+}
+
 async function requireUser(request, env) {
-  const user = userFrom(request);
+  const user = await authenticatedUser(request, env);
   if (!user) throw new Response(JSON.stringify({ error: "AUTH_REQUIRED" }), { status: 401, headers: JSON_HEADERS });
   const timestamp = now();
   await env.DB.prepare(
@@ -154,8 +178,8 @@ function rarityFor(catType, total = 0) {
   return "Common";
 }
 function levelFor(xp) { return Math.max(1, Math.floor(Math.sqrt(Math.max(0, Number(xp || 0)) / 100)) + 1); }
-function isAdmin(request, env) {
-  const user = userFrom(request);
+async function isAdmin(request, env) {
+  const user = await authenticatedUser(request, env);
   const configured = String(env.ADMIN_USER_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
   return Boolean(user && configured.includes(user.id));
 }
@@ -287,7 +311,7 @@ async function writeAudit(env, userId, action, entityType, entityId, metadata = 
 
 async function getSightings(request, env) {
   await ensureRuntimeTables(env);
-  const user = userFrom(request);
+  const user = await authenticatedUser(request, env);
   const current = now();
   const rows = user
     ? await env.DB.prepare(
@@ -753,7 +777,7 @@ async function getShareCard(request, env) {
 }
 
 async function getAdminAnalytics(request, env) {
-  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const [users, sightings, accepted, retention] = await Promise.all([
     env.DB.prepare("SELECT COUNT(*) AS total FROM users").first(),
     env.DB.prepare("SELECT COUNT(*) AS total FROM sightings").first(),
@@ -764,13 +788,13 @@ async function getAdminAnalytics(request, env) {
 }
 
 async function getModerationQueue(request, env) {
-  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const rows = await env.DB.prepare("SELECT id,target_type,target_id,reason,status,action,created_at,resolved_at FROM moderation_queue WHERE status='open' ORDER BY created_at ASC LIMIT 200").all();
   return json({ items: rows.results });
 }
 
 async function resolveModeration(request, env, moderationId) {
-  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const user = await requireUser(request, env);
   const body = await request.json().catch(() => ({}));
   const action = ["dismiss", "remove", "needs_review"].includes(body.action) ? body.action : "needs_review";
@@ -780,13 +804,13 @@ async function resolveModeration(request, env, moderationId) {
 }
 
 async function getPartnerReports(request, env) {
-  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const rows = await env.DB.prepare("SELECT id,partner_name,period_start,period_end,payload_json,created_at FROM partner_reports ORDER BY created_at DESC LIMIT 100").all();
   return json({ reports: rows.results.map((row) => ({ ...row, payload: JSON.parse(row.payload_json || "{}") })) });
 }
 
 async function createPartnerReport(request, env) {
-  if (!isAdmin(request, env)) return json({ error: "ADMIN_REQUIRED" }, 403);
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const user = await requireUser(request, env);
   const body = await request.json().catch(() => ({}));
   if (!String(body.partnerName || "").trim() || !body.periodStart || !body.periodEnd) return json({ error: "INVALID_PARTNER_REPORT" }, 400);
@@ -817,6 +841,7 @@ async function expireSightings(request, env) {
 
 async function api(request, env, url) {
   if (url.pathname === "/api/health") return json({ ok: true, service: "pawprint", time: now() });
+  if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "" });
   if (url.pathname === "/api/capture-sessions" && request.method === "POST") return startCaptureSession(request, env);
   if (url.pathname === "/api/dashboard" && request.method === "GET") return getDashboard(request, env);
   if (url.pathname === "/api/progress" && request.method === "GET") return getProgress(request, env);
@@ -881,7 +906,10 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/pawprint-cat.js") {
         return new Response(PAWPRINT_CAT_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
-      if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      if (request.method === "GET" && url.pathname === "/assets/supabase-auth.js") {
+        return new Response(SUPABASE_AUTH_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/auth/callback" || url.pathname === "/onboarding")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
     } catch (error) {
       if (error instanceof Response) return error;

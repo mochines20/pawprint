@@ -9,13 +9,15 @@ const sneakPeekSvg = fs.readFileSync(path.join(root, "assets", "pawprint-sneakpe
 const icon = fs.readFileSync(path.join(root, "assets", "pawprint-icon.svg"), "utf8");
 const catPaw = fs.readFileSync(path.join(root, "assets", "cat-paw.svg"), "utf8");
 const pawprintCat = fs.readFileSync(path.join(root, "assets", "pawprint-cat.js"), "utf8");
+const supabaseAuth = fs.readFileSync(path.join(root, "assets", "supabase-auth.js"), "utf8");
 const output = template
   .replace("__PAWPRINT_HTML__", JSON.stringify(html))
   .replace("__PAWPRINT_SNEAK_PEEK_GIF__", sneakPeek)
   .replace("__PAWPRINT_SNEAK_PEEK_SVG__", JSON.stringify(sneakPeekSvg))
   .replace("__PAWPRINT_ICON_SVG__", JSON.stringify(icon))
   .replace("__PAWPRINT_CAT_PAW_SVG__", JSON.stringify(catPaw))
-  .replace("__PAWPRINT_CAT_JS__", JSON.stringify(pawprintCat));
+  .replace("__PAWPRINT_CAT_JS__", JSON.stringify(pawprintCat))
+  .replace("__PAWPRINT_SUPABASE_AUTH_JS__", JSON.stringify(supabaseAuth));
 fs.mkdirSync(path.join(root, "dist", "server"), { recursive: true });
 fs.writeFileSync(path.join(root, "dist", "server", "index.js"), output);
 console.log("Generated dist/server/index.js");
