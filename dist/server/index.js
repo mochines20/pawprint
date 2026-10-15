@@ -901,6 +901,9 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/pawprint-icon.svg") {
         return new Response(PAWPRINT_ICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
       }
+      if (request.method === "GET" && url.pathname === "/favicon.ico") {
+        return new Response(PAWPRINT_ICON_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
+      }
       if (request.method === "GET" && url.pathname === "/assets/cat-paw.svg") {
         return new Response(CAT_PAW_SVG, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
       }

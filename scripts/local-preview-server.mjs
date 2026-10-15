@@ -14,6 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".webp": "image/webp",
 };
 
@@ -28,6 +29,37 @@ const server = createServer(async (request, response) => {
   if (url.pathname === "/api/auth/config") {
     response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ enabled: false, url: "", anonKey: "" }));
+    return;
+  }
+  if (url.pathname === "/api/journal" && request.method === "GET") {
+    response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ entries: [], demo: true }));
+    return;
+  }
+  if (url.pathname === "/api/dashboard" && request.method === "GET") {
+    response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ streak: { current: 4, best: 7 }, journal: { unique: 8 }, xp: 248, sightings: [], demo: true }));
+    return;
+  }
+  if (url.pathname === "/api/me" && request.method === "GET") {
+    response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ user: null, demo: true }));
+    return;
+  }
+  if (url.pathname === "/api/care-flags" && request.method === "GET") {
+    response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ flags: [], demo: true }));
+    return;
+  }
+  if (url.pathname === "/api/sightings" && request.method === "GET") {
+    response.writeHead(200, { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ sightings: [], demo: true }));
+    return;
+  }
+  if (url.pathname === "/favicon.ico" && request.method === "GET") {
+    const icon = await readFile(resolve(root, "assets", "pawprint-icon.svg"));
+    response.writeHead(200, { "cache-control": "public, max-age=3600", "content-type": "image/svg+xml" });
+    response.end(icon);
     return;
   }
   const target = safePath(url.pathname);
