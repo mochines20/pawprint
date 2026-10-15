@@ -228,6 +228,7 @@ async function getSightings(request, env) {
     id: row.id,
     catType: row.cat_type,
     description: row.description || "",
+    photoUrl: row.visibility === "public" ? `/api/sightings/${row.id}/photo` : null,
     area: geohashCenter(row.public_geohash),
     capturedAt: row.captured_at,
     publishedAt: row.published_at,
@@ -235,6 +236,25 @@ async function getSightings(request, env) {
     isOwner: Boolean(user && row.user_id === user.id),
     emergency: Boolean(row.emergency),
   }));
+}
+
+async function getSightingPhoto(request, env, sightingId) {
+  await ensureRuntimeTables(env);
+  const sighting = await env.DB.prepare(
+    `SELECT photo_key, visibility, validation_status, published_at, expires_at
+     FROM sightings WHERE id=? LIMIT 1`,
+  ).bind(sightingId).first();
+  const current = now();
+  if (!sighting || sighting.visibility !== "public" || sighting.validation_status !== "accepted" || sighting.published_at > current || sighting.expires_at <= current) {
+    return new Response("Not found", { status: 404 });
+  }
+  if (!env.BUCKET || !sighting.photo_key) return new Response("Not found", { status: 404 });
+  const object = await env.BUCKET.get(sighting.photo_key);
+  if (!object) return new Response("Not found", { status: 404 });
+  const headers = new Headers();
+  headers.set("content-type", object.httpMetadata?.contentType || "image/jpeg");
+  headers.set("cache-control", "public, max-age=300, must-revalidate");
+  return new Response(object.body, { headers });
 }
 
 async function startCaptureSession(request, env) {
@@ -536,6 +556,8 @@ async function api(request, env, url) {
   }
   if (url.pathname === "/api/sightings" && request.method === "GET") return json({ sightings: await getSightings(request, env) });
   if (url.pathname === "/api/sightings" && request.method === "POST") return createSighting(request, env);
+  const photoMatch = url.pathname.match(/^\/api\/sightings\/([^/]+)\/photo$/);
+  if (photoMatch && request.method === "GET") return getSightingPhoto(request, env, photoMatch[1]);
   if (url.pathname.startsWith("/api/sightings/") && request.method === "DELETE") return deleteSighting(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/journal" && request.method === "GET") return getJournal(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "GET") return getCareFlags(request, env);
