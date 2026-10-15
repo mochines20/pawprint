@@ -105,6 +105,7 @@ function onboardingMarkup() {
 }
 
 function openAuth(mode = "auth", accountMode = "login") {
+  if (window.pawprintDemoMode) return;
   if (!modal) return;
   modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup(accountMode)}</div>`;
   modal.classList.add("is-open");
@@ -297,7 +298,7 @@ function bindDocumentTriggers() {
 }
 
 function protectAppRoute() {
-  if (location.hash !== "#app" || window.pawprintSession) return;
+  if (window.pawprintDemoMode || location.hash !== "#app" || window.pawprintSession) return;
   document.body.classList.remove("is-app");
   history.replaceState({}, "", `${location.pathname}${location.search}#top`);
   openAuth("auth", "login");

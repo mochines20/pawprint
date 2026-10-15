@@ -296,7 +296,7 @@
     async function submitSighting(){if(!mediaStream||!captureLocation||!captureSessionId)return startCamera();canvas.width=video.videoWidth||640;canvas.height=video.videoHeight||480;canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.86));const form=new FormData();form.append('photo',blob,'pawprint.jpg');form.append('captureSessionId',captureSessionId);form.append('idempotencyKey',idempotencyKey);form.append('capturedAt',new Date().toISOString());form.append('latitude',String(captureLocation.latitude));form.append('longitude',String(captureLocation.longitude));form.append('visibility','friends');confirmButton.disabled=true;confirmButton.textContent='Checking photo…';try{const result=await api('/api/sightings',{method:'POST',body:form});lastSightingId=result.sightingId;notify(result.status==='accepted'?'Pawprint saved — +24 XP and your streak is safe.':'Pawprint received — it is waiting for a safe image check.');modal.classList.remove('open');stopCamera();loadDashboard()}catch(error){notify(error.message==='DUPLICATE_IMAGE'?'That photo was already submitted.':error.message==='AUTH_REQUIRED'?'Sign in to save a sighting.':error.message==='RATE_LIMITED'?'You have reached the hourly capture limit.':error.message==='CAPTURE_SESSION_INVALID'?'This capture expired. Start the camera again.':'The sighting could not be saved yet.')}finally{confirmButton.disabled=false}}
     document.querySelectorAll('[data-open-app]').forEach(b=>b.addEventListener('click',showApp));document.querySelectorAll('[data-show-landing]').forEach(b=>b.addEventListener('click',showLanding));document.getElementById('captureBtn').addEventListener('click',()=>modal.classList.add('open'));document.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click',()=>{modal.classList.remove('open');stopCamera()}));modal.addEventListener('click',e=>{if(e.target===modal){modal.classList.remove('open');stopCamera()}});confirmButton.addEventListener('click',()=>confirmButton.dataset.ready==='1'?submitSighting():startCamera());
     document.getElementById('careBtn').addEventListener('click',async()=>{if(!lastSightingId)return notify('Capture a sighting first so it can receive a Care Flag.');try{await api('/api/care-flags',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sightingId:lastSightingId,kind:'other',note:'Community member requested a care review.'})});notify('Care Flag sent for community review.')}catch(error){notify(error.message==='AUTH_REQUIRED'?'Sign in to send a Care Flag.':'Care Flag could not be sent yet.')}});
-    if(location.hash==='#app')showApp();
+    if(location.hash==='#app'&&new URLSearchParams(location.search).get('demo')!=='1')showApp();
   </script>
   <script>
     function renderLiveMap(sightings){const map=document.querySelector('.app-map');if(!map)return;map.querySelectorAll('.live-pin').forEach(pin=>pin.remove());const fallbackPins=map.querySelectorAll('.mini-pin:not(.live-pin)');fallbackPins.forEach(pin=>pin.hidden=Boolean(sightings.length));if(!sightings.length)return;const latitudes=sightings.map(item=>item.area.latitude),longitudes=sightings.map(item=>item.area.longitude),minLat=Math.min(...latitudes),maxLat=Math.max(...latitudes),minLon=Math.min(...longitudes),maxLon=Math.max(...longitudes),latSpan=Math.max(maxLat-minLat,.001),lonSpan=Math.max(maxLon-minLon,.001);sightings.slice(0,60).forEach(item=>{const pin=document.createElement('span');pin.className='mini-pin live-pin';pin.title=item.catType||'Verified pawprint';pin.style.setProperty('--pin-x',`${12+((item.area.longitude-minLon)/lonSpan)*76}%`);pin.style.setProperty('--pin-y',`${22+(1-(item.area.latitude-minLat)/latSpan)*58}%`);pin.innerHTML='<i></i>';map.appendChild(pin)})}
@@ -618,6 +618,69 @@
       const platform = document.getElementById('waitlistPlatform');
       if (!platform) return;
       platform.innerHTML = '<option value="ios_android">iOS + Android</option><option value="ios">iOS</option><option value="android">Android</option>';
+    })();
+  </script>
+  <script>
+    (() => {
+      const style = document.createElement('style');
+      style.textContent = `
+        .app-view{position:relative}
+        .demo-mode .app-shell{filter:blur(5px);pointer-events:none;user-select:none}
+        .demo-mode .auth-backdrop{display:none!important}
+        .demo-lock-layer{position:absolute;inset:18px;z-index:4;display:grid;place-items:center;padding:24px;pointer-events:auto}
+        .demo-lock-card{position:relative;max-width:430px;padding:30px;border:1px solid rgba(23,23,23,.12);border-radius:28px;background:rgba(255,255,255,.94);box-shadow:0 24px 70px rgba(23,23,23,.18);text-align:center;overflow:hidden}
+        .demo-lock-card:before,.demo-lock-card:after{position:absolute;content:'🐾';font-size:54px;opacity:.1;transform:rotate(-18deg)}
+        .demo-lock-card:before{left:-4px;top:8px}.demo-lock-card:after{right:-2px;bottom:6px;transform:rotate(18deg)}
+        .demo-lock-paws{display:flex;justify-content:center;gap:14px;margin-bottom:14px;font-size:30px;color:var(--amber,#ffb815)}
+        .demo-lock-card .eyebrow{display:block;margin-bottom:8px}.demo-lock-card h2{margin:0 0 10px;font-size:clamp(1.6rem,4vw,2.2rem)}
+        .demo-lock-card p{margin:0 auto 20px;max-width:34ch;color:#73777e;line-height:1.55}
+        .demo-lock-card .btn{position:relative;z-index:1}
+        @media (max-width:600px){.demo-lock-layer{inset:10px;padding:14px}.demo-lock-card{padding:24px 18px;border-radius:22px}}
+      `;
+      document.head.appendChild(style);
+      const body = document.body;
+      const app = document.getElementById('app');
+      const demoLink = document.querySelector('.cta a[href*="sneak_peek"]');
+      if (demoLink) {
+        demoLink.removeAttribute('data-open-app');
+        demoLink.dataset.openDemo = '1';
+        demoLink.href = '/?demo=1#app';
+        demoLink.textContent = 'Try the demo →';
+      }
+      const ensureLayer = () => {
+        if (!app || app.querySelector('.demo-lock-layer')) return;
+        const layer = document.createElement('div');
+        layer.className = 'demo-lock-layer';
+        layer.setAttribute('role', 'dialog');
+        layer.setAttribute('aria-label', 'Pawprint demo overview');
+        layer.innerHTML = '<div class="demo-lock-card"><div class="demo-lock-paws" aria-hidden="true"><span>🐾</span><span>🐾</span><span>🐾</span></div><span class="eyebrow">Demo overview</span><h2>See how Pawprint feels.</h2><p>Explore the mobile layout and flow without signing in. Real captures, private Journal data, and community actions stay locked behind an account.</p><button class="btn btn-amber" type="button" data-demo-signin>Sign up to unlock</button></div>';
+        layer.querySelector('[data-demo-signin]')?.addEventListener('click', () => { window.pawprintDemoMode = false; body.classList.remove('demo-mode'); window.pawprintOpenAuth?.('signup'); });
+        app.appendChild(layer);
+      };
+      const openDemo = () => {
+        window.pawprintDemoMode = true;
+        body.classList.add('is-app', 'demo-mode');
+        ensureLayer();
+        if (location.hash !== '#app') history.pushState({}, '', `${location.pathname}${location.search || '?demo=1'}#app`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+      const closeAuthInDemo = () => {
+        if (!window.pawprintDemoMode) return;
+        const auth = document.querySelector('.auth-backdrop');
+        if (auth?.classList.contains('is-open')) {
+          auth.classList.remove('is-open');
+          auth.setAttribute('aria-hidden', 'true');
+        }
+      };
+      new MutationObserver(closeAuthInDemo).observe(document.body, { childList: true, attributes: true, subtree: true });
+      document.addEventListener('click', event => {
+        const trigger = event.target.closest?.('[data-open-demo]');
+        if (!trigger) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openDemo();
+      }, true);
+      if (new URLSearchParams(location.search).get('demo') === '1' && location.hash === '#app') openDemo();
     })();
   </script>
 </body>
