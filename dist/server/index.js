@@ -126,7 +126,57 @@ async function sha256(bytes) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return btoa(binary);
+}
+
+function parseModelJson(text) {
+  const cleaned = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  try { return JSON.parse(cleaned); } catch { return JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || "{}"); }
+}
+
+async function validateWithGemini(env, bytes, contentType) {
+  const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: "Inspect this camera capture for Pawprint. Return JSON only. Accept only if a real cat is clearly visible. Reject if there is no cat, a person or recognizable human face, a screenshot or screen/photo-of-a-screen, unsafe or graphic content, or an uncertain result. Suggest one coat/pattern label from: orange tabby, tuxedo, black, white, calico, tortoiseshell, gray tabby, ginger-white, mixed, unclassified. Use booleans for catDetected, personDetected, screenshotDetected, unsafe, duplicate; include reason and suggestedCoatType." },
+        { inlineData: { mimeType: contentType || "image/jpeg", data: bytesToBase64(bytes) } },
+      ] }],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            catDetected: { type: "BOOLEAN" }, personDetected: { type: "BOOLEAN" }, screenshotDetected: { type: "BOOLEAN" },
+            unsafe: { type: "BOOLEAN" }, duplicate: { type: "BOOLEAN" }, reason: { type: "STRING" }, suggestedCoatType: { type: "STRING" },
+          },
+          required: ["catDetected", "personDetected", "screenshotDetected", "unsafe", "duplicate", "reason", "suggestedCoatType"],
+        },
+      },
+    }),
+  });
+  if (!response.ok) throw new Error(`GEMINI_${response.status}`);
+  const payload = await response.json();
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "";
+  const result = parseModelJson(text);
+  return {
+    status: result.catDetected && !result.personDetected && !result.screenshotDetected && !result.duplicate && !result.unsafe ? "accepted" : "rejected",
+    reason: result.reason || "AI_VALIDATION_REJECTED",
+    catType: result.suggestedCoatType || "Unclassified cat",
+  };
+}
+
 async function validatePhoto(env, bytes, contentType) {
+  if (env.GEMINI_API_KEY) {
+    try { return await validateWithGemini(env, bytes, contentType); }
+    catch { return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null }; }
+  }
   if (env.AI_VALIDATION_URL) {
     try {
       const response = await fetch(env.AI_VALIDATION_URL, {
