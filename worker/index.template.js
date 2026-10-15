@@ -108,14 +108,14 @@ async function getSightings(request, env) {
     ? await env.DB.prepare(
       `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility
        FROM sightings
-       WHERE validation_status='accepted' AND expires_at > ? AND (visibility='public' OR user_id=?)
+       WHERE validation_status='accepted' AND published_at <= ? AND expires_at > ? AND (visibility='public' OR user_id=?)
        ORDER BY captured_at DESC LIMIT 200`,
-    ).bind(current, user.id).all()
+    ).bind(current, current, user.id).all()
     : await env.DB.prepare(
       `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility
-       FROM sightings WHERE validation_status='accepted' AND visibility='public' AND expires_at > ?
+       FROM sightings WHERE validation_status='accepted' AND visibility='public' AND published_at <= ? AND expires_at > ?
        ORDER BY captured_at DESC LIMIT 200`,
-    ).bind(current).all();
+    ).bind(current, current).all();
   return rows.results.map((row) => ({
     id: row.id,
     catType: row.cat_type,
