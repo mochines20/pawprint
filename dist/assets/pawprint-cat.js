@@ -163,11 +163,11 @@
     '.pp-cat[data-action="look"] .pp-pupils{animation:pp-pupils 2.4s ease-in-out both}' +
     '.pp-cat[data-action="look"] .pp-ear-r{transform-box:fill-box;transform-origin:50% 100%;animation:pp-ear .5s ease-in-out 1.1s 2}' +
     /* hop + shadow (restarted from JS) */
-    '.pp-hop-go{animation:pp-hop .56s cubic-bezier(.3,.6,.4,1) both}' +
-    '.pp-shadow-go{animation:pp-shadow .56s ease-in-out both}' +
-    '@keyframes pp-hop{0%{transform:translateY(0) scale(1.1,.88)}20%{transform:translateY(-12px) scale(.93,1.1)}' +
-      '52%{transform:translateY(-58px) scale(.9,1.12)}84%{transform:translateY(0) scale(1.12,.86)}100%{transform:translateY(0) scale(1,1)}}' +
-    '@keyframes pp-shadow{0%,100%{transform:scaleX(1);opacity:.14}52%{transform:scaleX(.55);opacity:.06}}' +
+    '.pp-hop-go{animation:pp-hop .68s cubic-bezier(.26,.66,.35,1) both}' +
+    '.pp-shadow-go{animation:pp-shadow .68s ease-in-out both}' +
+    '@keyframes pp-hop{0%{transform:translateY(0) scale(1.08,.92)}18%{transform:translateY(-8px) scale(.96,1.05)}' +
+      '48%{transform:translateY(-48px) scale(.91,1.08)}78%{transform:translateY(-4px) scale(1.04,.96)}100%{transform:translateY(0) scale(1,1)}}' +
+    '@keyframes pp-shadow{0%,100%{transform:scaleX(1);opacity:.14}48%{transform:scaleX(.62);opacity:.06}}' +
     '@keyframes pp-sway{from{transform:rotate(-7deg)}to{transform:rotate(9deg)}}' +
     '@keyframes pp-breathe{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.035)}}' +
     '@keyframes pp-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}' +
@@ -183,7 +183,8 @@
     '@media print{.pp-cat{display:none}}';
 
   /* ------------------------------------------------------------- behaviour */
-  var HOP_MS = 560;
+  var HOP_MS = 680;
+  var HOP_GAP_MS = 320;
   var ACTIONS = [
     { name: 'groom', pose: 'groom', ms: 3400 },
     { name: 'look', pose: 'sit', ms: 2500 },
@@ -244,6 +245,7 @@
     var timers = [];
     var idleTimer = null, scrollTimer = null, raf = null;
     var scrolling = false, hopping = false, asleep = false, destroyed = false, inAction = false;
+    var nextHopAt = 0;
     var lastActivity = Date.now();
     var lastY = global.pageYOffset || 0;
     var x = 0, face = 1, lastAction = '';
@@ -291,7 +293,8 @@
 
     /* ---- hop ---- */
     function hop() {
-      if (hopping || asleep || destroyed) return;
+      if (hopping || asleep || destroyed || Date.now() < nextHopAt) return;
+      nextHopAt = Date.now() + HOP_MS + HOP_GAP_MS;
       hopping = true; inAction = false;
       clearIdle(); setAction('');
       setPose('sit');
@@ -300,7 +303,7 @@
       later(function () { setPose('sit'); }, 400);
       later(function () {
         hopping = false;
-        if (isActive()) hop(); else settle();
+        later(function () { if (isActive()) hop(); else settle(); }, HOP_GAP_MS);
       }, HOP_MS);
     }
 
@@ -362,7 +365,7 @@
       if (o.travel === 'across' && !reduce) kick(); else { x = target(); apply(); }
       if (reduce) { setPose('sit'); return; }
       if (inAction) { clearTimersOnly(); inAction = false; setAction(''); setPose('sit'); }
-      if (!hopping) hop();
+      if (!hopping && Date.now() >= nextHopAt) hop();
     }
     function clearTimersOnly() { clearTimers(); }
     function onResize() { x = target(); apply(); }
