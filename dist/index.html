@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151515">
+  <meta name="description" content="Pawprint is a playful way to spot street cats and help keep them safe.">
+  <title>Pawprint — Spot cats. Leave a trace.</title>
+  <style>
+    :root {
+      --ink: #151515;
+      --paper: #faf8f4;
+      --stone: #8c8a84;
+      --line: #e4e1da;
+      --amber: #ffb400;
+      --amber-soft: #fff0bd;
+      --red: #d9402b;
+      --white: #fff;
+      --radius-lg: 32px;
+      --radius-md: 20px;
+      --shadow: 0 18px 50px rgba(21, 21, 21, .11);
+      --font: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    button, a { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    .skip-link { position: absolute; left: -999px; top: 8px; z-index: 99; }
+    .skip-link:focus { left: 8px; background: var(--white); padding: 8px 12px; border-radius: 8px; }
+    .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar {
+      position: sticky; top: 0; z-index: 20; background: rgba(250,248,244,.92);
+      border-bottom: 1px solid rgba(228,225,218,.8); backdrop-filter: blur(14px);
+    }
+    .nav { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: -.04em; font-size: 1.15rem; }
+    .brand-mark { width: 33px; height: 33px; display: grid; place-items: center; color: var(--white); background: var(--ink); border-radius: 13px 13px 13px 4px; transform: rotate(-3deg); }
+    .brand-mark svg { width: 21px; height: 21px; }
+    .nav-links { display: flex; align-items: center; gap: 25px; color: #5c5a55; font-size: .92rem; }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-actions { display: flex; align-items: center; gap: 9px; }
+    .btn { border: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 45px; padding: 0 18px; border-radius: 999px; font-weight: 800; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:focus-visible, a:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+    .btn-dark { color: var(--white); background: var(--ink); box-shadow: 0 5px 0 #000; }
+    .btn-dark:hover { box-shadow: 0 7px 0 #000; }
+    .btn-amber { color: var(--ink); background: var(--amber); box-shadow: 0 5px 0 #c88900; }
+    .btn-amber:hover { box-shadow: 0 7px 0 #c88900; }
+    .btn-light { color: var(--ink); background: var(--white); border: 1px solid var(--line); }
+    .btn-small { min-height: 38px; padding: 0 14px; font-size: .88rem; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #6b6860; font-size: .75rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
+    .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+    .hero { padding: 86px 0 64px; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: 1.02fr .98fr; align-items: center; gap: 62px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 680px; margin-bottom: 22px; font-size: clamp(3.5rem, 7vw, 6.7rem); line-height: .91; letter-spacing: -.085em; }
+    h1 em { font-style: normal; position: relative; white-space: nowrap; }
+    h1 em::after { content: ""; position: absolute; left: 0; right: 5px; bottom: -7px; height: 10px; z-index: -1; background: var(--amber); transform: rotate(-2deg); border-radius: 60% 40%; }
+    .hero-copy { max-width: 510px; color: #5d5a54; font-size: 1.12rem; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 13px; margin: 30px 0 25px; }
+    .microcopy { color: var(--stone); font-size: .86rem; }
+    .microcopy strong { color: var(--ink); }
+    .hero-art { position: relative; min-height: 510px; }
+    .art-card { position: absolute; border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+    .art-map { inset: 30px 0 25px 55px; overflow: hidden; background: #e8e5dd; transform: rotate(2.5deg); }
+    .art-map::before, .app-map::before { content: ""; position: absolute; inset: 0; opacity: .75; background-image: linear-gradient(38deg, transparent 46%, #d1cec4 47%, #d1cec4 49%, transparent 50%), linear-gradient(145deg, transparent 44%, #d7d4cc 45%, #d7d4cc 47%, transparent 48%), linear-gradient(90deg, transparent 49%, rgba(255,255,255,.85) 50%, transparent 51%); background-size: 170px 150px, 210px 160px, 95px 95px; }
+    .art-map-label { position: absolute; left: 28px; top: 27px; z-index: 1; color: #79766e; font-size: .75rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .map-route { position: absolute; z-index: 1; width: 300px; height: 160px; right: 48px; top: 155px; border: 3px solid var(--ink); border-color: var(--ink) transparent transparent var(--ink); border-radius: 60% 0 0 0; transform: rotate(11deg); opacity: .75; }
+    .pin { position: absolute; z-index: 3; width: 36px; height: 36px; display: grid; place-items: center; color: var(--ink); background: var(--amber); border: 3px solid var(--ink); border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); box-shadow: 0 4px 0 rgba(21,21,21,.16); }
+    .pin svg { width: 18px; transform: rotate(45deg); }
+    .pin.one { left: 29%; top: 29%; } .pin.two { left: 67%; top: 50%; transform: rotate(-18deg); background: #fff; } .pin.three { left: 45%; top: 72%; transform: rotate(-45deg); }
+    .art-note { right: -8px; top: 8px; width: 180px; padding: 20px; background: var(--amber); transform: rotate(8deg); }
+    .art-note strong { display: block; font-size: 1.45rem; line-height: 1; letter-spacing: -.06em; }
+    .art-note span { display: block; margin-top: 10px; font-size: .84rem; font-weight: 700; }
+    .art-journal { left: 8px; bottom: 4px; width: 225px; padding: 16px; background: var(--white); transform: rotate(-7deg); }
+    .journal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 13px; font-size: .82rem; font-weight: 900; }
+    .paw-row { display: flex; gap: 7px; }
+    .paw-dot { width: 33px; height: 33px; display: grid; place-items: center; background: var(--paper); border-radius: 50%; }
+    .paw-dot svg { width: 20px; }
+    .trust-strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 0; }
+    .trust-items { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; color: var(--stone); font-size: .87rem; font-weight: 800; }
+    .trust-item { display: inline-flex; align-items: center; gap: 8px; }
+    .trust-item b { color: var(--ink); font-size: 1.1rem; }
+    .section { padding: 105px 0; }
+    .section-head { max-width: 660px; margin-bottom: 43px; }
+    h2 { margin-bottom: 15px; font-size: clamp(2.7rem, 5vw, 4.5rem); line-height: .95; letter-spacing: -.075em; }
+    .section-lede { color: #68655f; font-size: 1.08rem; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; }
+    .step { min-height: 245px; padding: 25px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--white); }
+    .step-num { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 38px; border-radius: 50%; color: var(--white); background: var(--ink); font-weight: 900; }
+    .step h3 { margin-bottom: 9px; font-size: 1.2rem; letter-spacing: -.04em; }
+    .step p { margin-bottom: 0; color: #716e67; font-size: .92rem; }
+    .dark-section { color: var(--white); background: var(--ink); }
+    .dark-section .section-lede { color: #aaa7a0; }
+    .product-grid { display: grid; grid-template-columns: .95fr 1.05fr; gap: 65px; align-items: center; }
+    .safety-list { display: grid; gap: 15px; margin: 30px 0 0; padding: 0; list-style: none; }
+    .safety-list li { display: grid; grid-template-columns: 35px 1fr; gap: 12px; align-items: start; color: #c4c0b8; }
+    .safety-list b { color: var(--white); display: block; margin-bottom: 3px; }
+    .safety-icon { width: 30px; height: 30px; display: grid; place-items: center; color: var(--ink); background: var(--amber); border-radius: 50%; }
+    .safety-icon svg { width: 16px; }
+    .phone-wrap { display: flex; justify-content: center; }
+    .phone { width: min(100%, 350px); min-height: 535px; padding: 12px; border: 8px solid #2d2d2d; border-radius: 41px; background: #242424; box-shadow: 0 30px 70px rgba(0,0,0,.3); }
+    .phone-screen { overflow: hidden; height: 100%; min-height: 495px; padding: 22px 18px; border-radius: 29px; background: var(--paper); }
+    .phone-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: .74rem; font-weight: 900; }
+    .mini-logo { display: inline-flex; align-items: center; gap: 5px; }
+    .mini-logo-mark { width: 21px; height: 21px; display: grid; place-items: center; border-radius: 8px 8px 8px 2px; color: var(--white); background: var(--ink); }
+    .mini-logo-mark svg { width: 14px; }
+    .phone-title { display: flex; justify-content: space-between; align-items: end; margin-bottom: 15px; }
+    .phone-title h3 { margin: 0; font-size: 1.45rem; letter-spacing: -.06em; }
+    .streak { padding: 7px 9px; border-radius: 10px; color: var(--ink); background: var(--amber); font-size: .71rem; font-weight: 900; }
+    .mini-map { position: relative; height: 265px; overflow: hidden; border: 1px solid var(--line); border-radius: 21px; background: #e6e2d9; }
+    .mini-map::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(25deg, transparent 44%, #d1cec4 45%, #d1cec4 47%, transparent 48%), linear-gradient(150deg, transparent 53%, #d1cec4 54%, #d1cec4 56%, transparent 57%); background-size: 110px 85px, 135px 100px; }
+    .mini-map .pin { width: 30px; height: 30px; border-width: 2px; }
+    .mini-map .pin svg { width: 14px; }
+    .mini-map .pin.one { left: 21%; top: 25%; } .mini-map .pin.two { left: 58%; top: 47%; } .mini-map .pin.three { left: 37%; top: 70%; }
+    .phone-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
+    .mini-stat { padding: 13px; border-radius: 15px; background: var(--white); }
+    .mini-stat span { display: block; color: var(--stone); font-size: .7rem; }
+    .mini-stat strong { display: block; margin-top: 3px; font-size: 1.35rem; letter-spacing: -.06em; }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .feature { padding: 28px; border-top: 3px solid var(--ink); background: var(--white); }
+    .feature:nth-child(2) { border-color: var(--amber); } .feature:nth-child(3) { border-color: var(--red); }
+    .feature-icon { width: 45px; height: 45px; display: grid; place-items: center; margin-bottom: 28px; border-radius: 15px; background: var(--paper); }
+    .feature-icon svg { width: 24px; height: 24px; }
+    .feature h3 { margin-bottom: 8px; letter-spacing: -.04em; }
+    .feature p { margin-bottom: 0; color: #716e67; font-size: .92rem; }
+    .roadmap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .roadmap-card { padding: 25px; border: 1px solid var(--line); border-radius: var(--radius-md); }
+    .roadmap-card.current { border: 2px solid var(--ink); background: var(--amber); }
+    .roadmap-card span { display: block; margin-bottom: 30px; font-size: .78rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .roadmap-card h3 { margin-bottom: 10px; font-size: 1.5rem; letter-spacing: -.06em; }
+    .roadmap-card p { margin-bottom: 0; color: #716e67; font-size: .92rem; }
+    .roadmap-card.current p { color: #4c3900; }
+    .cta { padding: 75px 0; }
+    .cta-box { position: relative; overflow: hidden; padding: 60px; border-radius: var(--radius-lg); background: var(--amber); }
+    .cta-box::after { content: "✦"; position: absolute; right: 50px; bottom: -43px; color: rgba(21,21,21,.1); font-size: 210px; transform: rotate(15deg); }
+    .cta-box h2 { position: relative; z-index: 1; max-width: 540px; margin-bottom: 22px; }
+    .cta-box p { position: relative; z-index: 1; max-width: 490px; margin-bottom: 25px; color: #4b3901; }
+    footer { padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--stone); font-size: .83rem; }
+    .footer-row { display: flex; justify-content: space-between; gap: 20px; }
+    .footer-row strong { color: var(--ink); }
+    .app-view { display: none; min-height: calc(100vh - 77px); padding: 28px 0 60px; }
+    body.is-app .landing { display: none; }
+    body.is-app .app-view { display: block; }
+    .app-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+    .app-top h1 { margin: 0; font-size: 2.5rem; }
+    .app-top .eyebrow { font-size: .68rem; }
+    .app-layout { display: grid; grid-template-columns: 1.1fr .9fr; gap: 20px; }
+    .app-card { padding: 20px; border: 1px solid var(--line); border-radius: 24px; background: var(--white); }
+    .app-card h2 { margin-bottom: 14px; font-size: 1.35rem; letter-spacing: -.05em; }
+    .app-map { position: relative; min-height: 505px; overflow: hidden; border-radius: 20px; background: #e7e3d9; }
+    .app-map::after { content: "ALABANG · TODAY"; position: absolute; left: 17px; bottom: 16px; padding: 7px 10px; border-radius: 999px; color: #706d66; background: rgba(250,248,244,.9); font-size: .67rem; font-weight: 900; letter-spacing: .08em; }
+    .app-map .street { position: absolute; height: 18px; border-radius: 20px; background: rgba(255,255,255,.8); transform: rotate(-22deg); }
+    .app-map .street.a { width: 140%; top: 21%; left: -25%; } .app-map .street.b { width: 120%; top: 65%; left: -5%; transform: rotate(13deg); } .app-map .street.c { width: 80%; top: 47%; left: 15%; transform: rotate(72deg); }
+    .app-map .pin { width: 40px; height: 40px; }
+    .app-map .pin.one { left: 27%; top: 25%; } .app-map .pin.two { left: 63%; top: 46%; } .app-map .pin.three { left: 42%; top: 69%; }
+    .app-side { display: grid; align-content: start; gap: 20px; }
+    .profile-row { display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 45px; height: 45px; display: grid; place-items: center; border-radius: 16px; background: var(--amber-soft); }
+    .avatar svg { width: 28px; }
+    .profile-row strong { display: block; letter-spacing: -.03em; } .profile-row span { color: var(--stone); font-size: .8rem; }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .metric { padding: 15px; border-radius: 16px; background: var(--paper); } .metric span { display: block; color: var(--stone); font-size: .75rem; } .metric strong { display: block; margin-top: 5px; font-size: 1.55rem; letter-spacing: -.07em; }
+    .journal-list { display: grid; gap: 10px; }
+    .journal-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; background: var(--paper); }
+    .journal-cat { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 13px; background: var(--ink); color: var(--white); } .journal-cat svg { width: 24px; }
+    .journal-item strong { display: block; font-size: .86rem; } .journal-item span { display: block; color: var(--stone); font-size: .72rem; }
+    .care-callout { padding: 15px; border-radius: 16px; background: #fff0ed; color: #6f2117; } .care-callout strong { display: block; margin-bottom: 3px; color: var(--red); font-size: .86rem; } .care-callout p { margin: 0; font-size: .78rem; }
+    .app-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: none; place-items: end center; padding: 18px; background: rgba(21,21,21,.5); }
+    .modal-backdrop.open { display: grid; }
+    .modal { width: min(100%, 470px); padding: 25px; border-radius: 26px; background: var(--paper); box-shadow: var(--shadow); animation: lift .25s ease; }
+    @keyframes lift { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .modal h2 { margin-bottom: 10px; font-size: 2rem; } .modal p { color: #6f6c64; font-size: .92rem; }
+    .capture-preview { height: 180px; display: grid; place-items: center; margin: 17px 0; border: 2px dashed #bbb7ae; border-radius: 20px; background: #e8e4da; } .capture-preview svg { width: 70px; height: 70px; }
+    .modal-actions { display: flex; gap: 9px; justify-content: flex-end; }
+    .toast { position: fixed; left: 50%; bottom: 22px; z-index: 60; max-width: calc(100% - 32px); padding: 12px 17px; border-radius: 999px; color: var(--white); background: var(--ink); box-shadow: var(--shadow); transform: translate(-50%, 120px); transition: transform .25s ease; font-size: .88rem; font-weight: 800; }
+    .toast.show { transform: translate(-50%, 0); }
+    @media (max-width: 850px) {
+      .hero-grid, .product-grid, .app-layout { grid-template-columns: 1fr; }
+      .hero { padding-top: 55px; } .hero-art { min-height: 430px; max-width: 600px; width: 100%; margin: 0 auto; }
+      .steps { grid-template-columns: 1fr 1fr; } .features { grid-template-columns: 1fr; } .roadmap { grid-template-columns: 1fr; }
+      .app-map { min-height: 400px; }
+    }
+    @media (max-width: 600px) {
+      .shell { width: min(100% - 28px, 1180px); }
+      .nav { min-height: 68px; } .nav-links { display: none; } .nav-actions .btn-light { display: none; } .nav-actions .btn { min-height: 38px; padding: 0 13px; font-size: .84rem; }
+      .hero { padding: 46px 0 48px; } h1 { font-size: clamp(3.3rem, 18vw, 5rem); } .hero-copy { font-size: 1rem; }
+      .hero-art { min-height: 330px; } .art-map { inset: 24px 0 20px 25px; } .art-note { right: -4px; width: 150px; padding: 15px; } .art-note strong { font-size: 1.2rem; } .art-journal { left: -2px; width: 185px; padding: 13px; }
+      .section { padding: 72px 0; } h2 { font-size: 2.8rem; }
+      .steps { grid-template-columns: 1fr; } .step { min-height: 0; padding: 20px; } .step-num { margin-bottom: 22px; }
+      .cta-box { padding: 34px 25px; } .cta-box::after { right: -18px; font-size: 150px; } .footer-row { flex-direction: column; }
+      .app-top { align-items: flex-start; gap: 15px; flex-direction: column; } .app-top h1 { font-size: 2.1rem; } .app-card { padding: 14px; } .app-map { min-height: 350px; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="shell nav">
+      <a class="brand" href="#top" aria-label="Pawprint home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M9 24V7.8c0-1.6 1.4-2.8 3-2.8h8c3.9 0 7 3.1 7 7s-3.1 7-7 7h-5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><circle cx="16" cy="11" r="1.4" fill="currentColor"/><circle cx="21" cy="11" r="1.4" fill="currentColor"/></svg></span>
+        Pawprint
+      </a>
+      <nav class="nav-links" aria-label="Main navigation"><a href="#how">How it works</a><a href="#safety">Safety first</a><a href="#roadmap">Roadmap</a></nav>
+      <div class="nav-actions"><a class="btn btn-light btn-small" href="#roadmap">Coming soon</a><button class="btn btn-dark btn-small" data-open-app>Open the app <span aria-hidden="true">↗</span></button></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="landing" id="top">
+      <section class="hero">
+        <div class="shell hero-grid">
+          <div>
+            <span class="eyebrow">A cat map for curious people</span>
+            <h1>Spot cats.<br>Leave a <em>trace.</em></h1>
+            <p class="hero-copy">Pawprint turns everyday cat sightings into a little collection game—with a softer, safer map that helps street cats stay protected.</p>
+            <div class="hero-actions"><button class="btn btn-amber" data-open-app>Open the browser app <span aria-hidden="true">→</span></button><a class="btn btn-light" href="#how">See how it works</a></div>
+            <p class="microcopy"><strong>Browser-first.</strong> iOS and Android versions are coming soon.</p>
+          </div>
+          <div class="hero-art" aria-label="Illustration of a cat sighting map">
+            <div class="art-card art-map"><span class="art-map-label">Alabang · live map</span><span class="map-route"></span><span class="pin one"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin two"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin three"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span></div>
+            <div class="art-card art-note"><strong>+24 XP</strong><span>New cat in your Journal</span></div>
+            <div class="art-card art-journal"><div class="journal-head"><span>Cat Journal</span><span>03 / 12</span></div><div class="paw-row"><span class="paw-dot"><svg viewBox="0 0 24 24" fill="none"><path d="M8 11c-2.2 0-3.2-2.1-2.4-3.8.6-1.3 2.1-1.3 2.8-.2.5.8.6 1.8.5 2.6M16 11c2.2 0 3.2-2.1 2.4-3.8-.6-1.3-2.1-1.3-2.8-.2-.5.8-.6 1.8-.5 2.6M11 8.3c-1.4-1.8-.7-4.3 1-4.3s2.4 2.5 1 4.3M12 20c-2.6 0-5.2-1.2-5.2-3.4 0-2.1 2-3.6 3.8-3.6.8 0 .9.6 1.4.6s.6-.6 1.4-.6c1.8 0 3.8 1.5 3.8 3.6C17.2 18.8 14.6 20 12 20Z" fill="currentColor"/></svg></span><span class="paw-dot"><svg viewBox="0 0 24 24" fill="none"><path d="M8 11c-2.2 0-3.2-2.1-2.4-3.8.6-1.3 2.1-1.3 2.8-.2.5.8.6 1.8.5 2.6M16 11c2.2 0 3.2-2.1 2.4-3.8-.6-1.3-2.1-1.3-2.8-.2-.5.8-.6 1.8-.5 2.6M11 8.3c-1.4-1.8-.7-4.3 1-4.3s2.4 2.5 1 4.3M12 20c-2.6 0-5.2-1.2-5.2-3.4 0-2.1 2-3.6 3.8-3.6.8 0 .9.6 1.4.6s.6-.6 1.4-.6c1.8 0 3.8 1.5 3.8 3.6C17.2 18.8 14.6 20 12 20Z" fill="currentColor"/></svg></span><span class="paw-dot"><svg viewBox="0 0 24 24" fill="none"><path d="M8 11c-2.2 0-3.2-2.1-2.4-3.8.6-1.3 2.1-1.3 2.8-.2.5.8.6 1.8.5 2.6M16 11c2.2 0 3.2-2.1 2.4-3.8-.6-1.3-2.1-1.3-2.8-.2-.5.8-.6 1.8-.5 2.6M11 8.3c-1.4-1.8-.7-4.3 1-4.3s2.4 2.5 1 4.3M12 20c-2.6 0-5.2-1.2-5.2-3.4 0-2.1 2-3.6 3.8-3.6.8 0 .9.6 1.4.6s.6-.6 1.4-.6c1.8 0 3.8 1.5 3.8 3.6C17.2 18.8 14.6 20 12 20Z" fill="currentColor"/></svg></span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="trust-strip"><div class="shell trust-items"><span class="trust-item"><b>24h</b> sightings on the public map</span><span class="trust-item"><b>100–200m</b> approximate public areas</span><span class="trust-item"><b>0</b> exact locations shared</span><span class="trust-item"><b>∞</b> cats in your Journal</span></div></div>
+
+      <section class="section" id="how"><div class="shell"><div class="section-head"><span class="eyebrow">Simple by design</span><h2>A small ritual for the cats you notice.</h2><p class="section-lede">The public map moves quickly. Your Journal keeps the memory. Every step is built to reward care, not chasing.</p></div><div class="steps"><article class="step"><div class="step-num">01</div><h3>Spot</h3><p>Use the camera when you meet a cat out in the world. No gallery uploads for streaks.</p></article><article class="step"><div class="step-num">02</div><h3>Check</h3><p>A quick check confirms there is a cat and keeps duplicate or unsafe posts out.</p></article><article class="step"><div class="step-num">03</div><h3>Pin</h3><p>Your sighting appears as a delayed, approximate area—not an exact point someone can follow.</p></article><article class="step"><div class="step-num">04</div><h3>Collect</h3><p>Earn a little XP, grow your streak, and keep the cat in your private Cat Journal.</p></article></div></div></section>
+
+      <section class="section dark-section" id="safety"><div class="shell product-grid"><div><span class="eyebrow">Protection comes first</span><h2>A softer map for a more careful world.</h2><p class="section-lede">Pawprint is playful, but cats are not collectibles to be chased. Safety features are part of the core product.</p><ul class="safety-list"><li><span class="safety-icon">✓</span><span><b>Approximate and delayed</b> Public pins never reveal exact locations or live movement.</span></li><li><span class="safety-icon">✓</span><span><b>Care flags</b> Mark a cat that may need help without pretending to diagnose.</span></li><li><span class="safety-icon">✓</span><span><b>Easy reporting</b> Unsafe spots, harmful content, and privacy concerns can be surfaced quickly.</span></li><li><span class="safety-icon">✓</span><span><b>Human behaviour matters</b> The app reminds people not to chase, touch, or use flash at night.</span></li></ul></div><div class="phone-wrap"><div class="phone"><div class="phone-screen"><div class="phone-top"><span class="mini-logo"><span class="mini-logo-mark"><svg viewBox="0 0 32 32" fill="none"><path d="M9 24V7.8c0-1.6 1.4-2.8 3-2.8h8c3.9 0 7 3.1 7 7s-3.1 7-7 7h-5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><circle cx="16" cy="11" r="1.4" fill="currentColor"/><circle cx="21" cy="11" r="1.4" fill="currentColor"/></svg></span> Pawprint</span><span>9:41</span></div><div class="phone-title"><h3>Good morning, JC</h3><span class="streak">🔥 4 day streak</span></div><div class="mini-map"><span class="pin one"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin two"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin three"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span></div><div class="phone-bottom"><div class="mini-stat"><span>Spotted this month</span><strong>12</strong></div><div class="mini-stat"><span>Journal cats</span><strong>08</strong></div></div></div></div></div></section>
+
+      <section class="section"><div class="shell"><div class="section-head"><span class="eyebrow">Made for the everyday</span><h2>Enough game to keep you coming back.</h2></div><div class="features"><article class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="2"/></svg></div><h3>Streaks with breathing room</h3><p>Spot once a day to keep your run going. A weekly Freeze and planned Rest Day keep it human.</p></article><article class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><path d="m9.5 10 1.6 1.6 3.4-3.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>Rarity that stays local</h3><p>A coat pattern can be common in one place and rare in another. The map learns with the community.</p></article><article class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s8-4.5 8-11V5l-8-2-8 2v5c0 6.5 8 11 8 11Z" stroke="currentColor" stroke-width="2"/><path d="m8.5 12 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>Care is never premium</h3><p>Care Flags, reporting, and safety tools stay available to everyone from day one.</p></article></div></div></section>
+
+      <section class="section" id="roadmap"><div class="shell"><div class="section-head"><span class="eyebrow">The path ahead</span><h2>Start small. Grow with the cats.</h2><p class="section-lede">The first version proves the core loop in Alabang. The rest should earn its place through real use.</p></div><div class="roadmap"><article class="roadmap-card current"><span>Now · Browser PWA</span><h3>Spot & collect</h3><p>Camera, safe map pins, Cat Journal, streaks, rarity, Care Flags, reports, and privacy controls.</p></article><article class="roadmap-card"><span>Next · Community</span><h3>Find your people</h3><p>Quests, levels, friends, local groups, naming, reactions, rescue requests, and a vet finder.</p></article><article class="roadmap-card"><span>Soon · Native apps</span><h3>In your pocket</h3><p>iOS and Android versions through Capacitor, with better camera and notification support.</p></article></div></div></section>
+
+      <section class="cta"><div class="shell"><div class="cta-box"><h2>Ready to leave your first pawprint?</h2><p>Try the browser preview now. It is designed mobile-first, so it feels like a tiny app even before the native versions arrive.</p><button class="btn btn-dark" data-open-app>Open Pawprint <span aria-hidden="true">→</span></button></div></div></section>
+    </div>
+
+    <section class="app-view" id="app" aria-label="Pawprint browser app">
+      <div class="shell"><div class="app-top"><div><span class="eyebrow">Browser app · pilot preview</span><h1>Your map, your Journal.</h1></div><button class="btn btn-light btn-small" data-show-landing>← Back to Pawprint</button></div><div class="app-layout"><div class="app-card"><div class="app-map"><span class="street a"></span><span class="street b"></span><span class="street c"></span><span class="pin one"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin two"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6-7 11-7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span><span class="pin three"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="currentColor"/></svg></span></div><div class="app-actions"><button class="btn btn-amber" id="captureBtn">＋ Spot a cat</button><button class="btn btn-light" id="careBtn">⚑ Care flag</button></div></div><aside class="app-side"><div class="app-card"><div class="profile-row"><div class="avatar"><svg viewBox="0 0 32 32" fill="none"><path d="m7 14 1-7 6 4h4l6-4 1 7v6c0 4-5 7-9 7s-9-3-9-7v-6Z" fill="#151515"/><path d="m10 20 3 2m9-2-3 2" stroke="#FAF8F4" stroke-width="1.8" stroke-linecap="round"/><circle cx="12.5" cy="16" r="1.3" fill="#FAF8F4"/><circle cx="19.5" cy="16" r="1.3" fill="#FAF8F4"/></svg></div><div><strong>JC's Cat Journal</strong><span>Alabang · 4 day streak</span></div></div></div><div class="app-card"><h2>Your progress</h2><div class="metric-grid"><div class="metric"><span>Spotted</span><strong id="spottedMetric">12</strong></div><div class="metric"><span>XP earned</span><strong id="xpMetric">248</strong></div><div class="metric"><span>Rare finds</span><strong>02</strong></div><div class="metric"><span>Areas</span><strong>04</strong></div></div></div><div class="app-card"><h2>Recent pawprints</h2><div class="journal-list" id="journalList"><div class="journal-item"><span class="journal-cat"><svg viewBox="0 0 32 32" fill="none"><path d="m7 14 1-7 6 4h4l6-4 1 7v6c0 4-5 7-9 7s-9-3-9-7v-6Z" fill="currentColor"/><circle cx="12.5" cy="16" r="1.3" fill="#FFB400"/><circle cx="19.5" cy="16" r="1.3" fill="#FFB400"/></svg></span><span><strong>Orange tabby</strong><span>10 minutes ago · common</span></span></div><div class="journal-item"><span class="journal-cat" style="background:#FFB400;color:#151515"><svg viewBox="0 0 32 32" fill="none"><path d="m7 14 1-7 6 4h4l6-4 1 7v6c0 4-5-3-9-3s-9 3-9 3v-6Z" fill="currentColor"/></svg></span><span><strong>Tuxedo</strong><span>Yesterday · uncommon</span></span></div></div></div><div class="care-callout"><strong>See a cat that needs help?</strong><p>Flag it for the community. Pawprint never gives a diagnosis, but it can help the right people notice.</p></div></aside></div></div>
+    </section>
+  </main>
+
+  <footer><div class="shell footer-row"><span><strong>Pawprint</strong> · Spot cats. Leave a trace.</span><span>Browser first · iOS and Android coming soon</span></div></footer>
+
+  <div class="modal-backdrop" id="captureModal" role="dialog" aria-modal="true" aria-labelledby="captureTitle"><div class="modal"><h2 id="captureTitle">Spot a cat</h2><p>This browser preview simulates the in-app camera flow. In the full app, only a fresh photo taken inside Pawprint can earn streak and rarity credit.</p><div class="capture-preview"><svg viewBox="0 0 80 80" fill="none"><path d="m18 39 3-22 17 11h4l17-11 3 22v18c0 7-12 13-22 13S18 64 18 57V39Z" fill="#151515"/><circle cx="32" cy="43" r="3" fill="#FFB400"/><circle cx="48" cy="43" r="3" fill="#FFB400"/><path d="M32 55c4 3 12 3 16 0" stroke="#FFB400" stroke-width="3" stroke-linecap="round"/></svg></div><div class="modal-actions"><button class="btn btn-light btn-small" data-close-modal>Not now</button><button class="btn btn-amber btn-small" id="confirmCapture">Use camera preview</button></div></div></div>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    const body = document.body;
+    const modal = document.getElementById('captureModal');
+    const toast = document.getElementById('toast');
+    const spottedMetric = document.getElementById('spottedMetric');
+    const xpMetric = document.getElementById('xpMetric');
+    const journalList = document.getElementById('journalList');
+    let toastTimer;
+    const catSvg = '<svg viewBox="0 0 32 32" fill="none"><path d="m7 14 1-7 6 4h4l6-4 1 7v6c0 4-5-3-9-3s-9 3-9 3v-6Z" fill="currentColor"/><circle cx="12.5" cy="16" r="1.3" fill="#FFB400"/><circle cx="19.5" cy="16" r="1.3" fill="#FFB400"/></svg>';
+    function showApp() { body.classList.add('is-app'); window.location.hash = 'app'; window.scrollTo({top: 0, behavior: 'smooth'}); }
+    function showLanding() { body.classList.remove('is-app'); window.location.hash = 'top'; window.scrollTo({top: 0, behavior: 'smooth'}); }
+    function notify(message) { toast.textContent = message; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 3400); }
+    document.querySelectorAll('[data-open-app]').forEach((button) => button.addEventListener('click', showApp));
+    document.querySelectorAll('[data-show-landing]').forEach((button) => button.addEventListener('click', showLanding));
+    document.getElementById('captureBtn').addEventListener('click', () => modal.classList.add('open'));
+    document.querySelectorAll('[data-close-modal]').forEach((button) => button.addEventListener('click', () => modal.classList.remove('open')));
+    modal.addEventListener('click', (event) => { if (event.target === modal) modal.classList.remove('open'); });
+    document.getElementById('confirmCapture').addEventListener('click', () => {
+      modal.classList.remove('open');
+      spottedMetric.textContent = String(Number(spottedMetric.textContent) + 1).padStart(2, '0');
+      xpMetric.textContent = String(Number(xpMetric.textContent) + 24);
+      const item = document.createElement('div');
+      item.className = 'journal-item';
+      item.innerHTML = '<span class="journal-cat">' + catSvg + '</span><span><strong>New pawprint</strong><span>Just now · added to Journal</span></span>';
+      journalList.prepend(item);
+      notify('Pawprint saved — +24 XP and your streak is safe.');
+    });
+    document.getElementById('careBtn').addEventListener('click', () => notify('Care Flag preview: in the full app, this goes to nearby volunteers and reviewers.'));
+    if (window.location.hash === '#app') showApp();
+  </script>
+</body>
+</html>
