@@ -533,5 +533,8 @@
   <script>
     (()=>{const platform=document.getElementById('waitlistPlatform');if(platform){platform.innerHTML='<option value="ios">iOS</option><option value="android">Android</option>';}})();
   </script>
+  <script>
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js?v=2').catch(() => {}));
+  </script>
 </body>
 </html>
