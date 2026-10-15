@@ -1,4 +1,5 @@
 const APP_HTML = __PAWPRINT_HTML__;
+const SNEAK_PEEK_GIF = "__PAWPRINT_SNEAK_PEEK_GIF__";
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v1'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
@@ -124,6 +125,10 @@ async function ensureRuntimeTables(env) {
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS partner_reports (
       id TEXT PRIMARY KEY, partner_name TEXT NOT NULL, period_start TEXT NOT NULL, period_end TEXT NOT NULL,
       payload_json TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS waitlist_signups (
+      id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, platform_interest TEXT NOT NULL DEFAULT 'ios_android',
+      source TEXT, created_at TEXT NOT NULL
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS community_assets_kind_idx ON community_assets (kind, created_at DESC)"),
@@ -787,6 +792,17 @@ async function createPartnerReport(request, env) {
   return json({ reportId, status: "created" }, 201);
 }
 
+async function createWaitlist(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email || "").trim().toLowerCase();
+  const platformInterest = ["ios", "android", "ios_android"].includes(body.platformInterest) ? body.platformInterest : "ios_android";
+  const source = String(body.source || "landing").trim().slice(0, 80) || "landing";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json({ error: "INVALID_EMAIL" }, 400);
+  await env.DB.prepare("INSERT OR IGNORE INTO waitlist_signups (id,email,platform_interest,source,created_at) VALUES (?,?,?,?,?)")
+    .bind(id(), email, platformInterest, source, now()).run();
+  return json({ status: "subscribed", platformInterest }, 201);
+}
+
 async function expireSightings(request, env) {
   const secret = env.EXPIRY_JOB_TOKEN;
   const auth = request.headers.get("authorization");
@@ -816,6 +832,7 @@ async function api(request, env, url) {
   if (url.pathname.startsWith("/api/admin/moderation/") && request.method === "POST") return resolveModeration(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/admin/partner-reports" && request.method === "GET") return getPartnerReports(request, env);
   if (url.pathname === "/api/admin/partner-reports" && request.method === "POST") return createPartnerReport(request, env);
+  if (url.pathname === "/api/waitlist" && request.method === "POST") return createWaitlist(request, env);
   if (url.pathname === "/api/me" && request.method === "GET") {
     return getProfile(request, env);
   }
@@ -843,6 +860,11 @@ export default {
       if (url.pathname.startsWith("/api/")) return await api(request, env, url);
       if (request.method === "GET" && url.pathname === "/manifest.webmanifest") return new Response(PWA_MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=3600" } });
       if (request.method === "GET" && url.pathname === "/sw.js") return new Response(PWA_SERVICE_WORKER, { headers: { "content-type": "application/javascript", "cache-control": "public, max-age=3600" } });
+      if (request.method === "GET" && url.pathname === "/assets/pawprint-sneak-peek.gif") {
+        const binary = atob(SNEAK_PEEK_GIF);
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        return new Response(bytes, { headers: { "content-type": "image/gif", "cache-control": "public, max-age=86400" } });
+      }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
     } catch (error) {
