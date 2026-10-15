@@ -1,0 +1,9 @@
+Sneak peek at my next project: Pawprint 🐾
+
+A browser-first cat spotting experience built around privacy, care, and a softer community map.
+
+The idea is simple: spot cats, leave a trace, and help people notice when a cat may need support — without exposing exact locations.
+
+Still building, but I’m excited to share more soon.
+
+#Pawprint #ProductDesign #WebDevelopment #BuildInPublic #UXDesign

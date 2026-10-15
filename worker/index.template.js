@@ -128,6 +128,69 @@ async function getSightings(request, env) {
   }));
 }
 
+async function getJournal(request, env) {
+  const user = await requireUser(request, env);
+  const rows = await env.DB.prepare(
+    `SELECT journal_entries.id, journal_entries.sighting_id, journal_entries.cat_type,
+            journal_entries.spotted_at, journal_entries.first_spotted, journal_entries.created_at,
+            sightings.visibility, sightings.validation_status, sightings.expires_at
+     FROM journal_entries
+     JOIN sightings ON sightings.id = journal_entries.sighting_id
+     WHERE journal_entries.user_id=?
+     ORDER BY journal_entries.spotted_at DESC LIMIT 200`,
+  ).bind(user.id).all();
+  const summary = await env.DB.prepare(
+    `SELECT COUNT(*) AS total, SUM(CASE WHEN first_spotted=1 THEN 1 ELSE 0 END) AS unique_count
+     FROM journal_entries WHERE user_id=?`,
+  ).bind(user.id).first();
+  return json({
+    entries: rows.results.map((row) => ({
+      id: row.id,
+      sightingId: row.sighting_id,
+      catType: row.cat_type || "Unclassified cat",
+      spottedAt: row.spotted_at,
+      firstSpotted: Boolean(row.first_spotted),
+      visibility: row.visibility,
+      validationStatus: row.validation_status,
+      expiresAt: row.expires_at,
+    })),
+    summary: { total: Number(summary?.total || 0), unique: Number(summary?.unique_count || 0) },
+  });
+}
+
+async function getCareFlags(request, env) {
+  const user = await requireUser(request, env);
+  const rows = await env.DB.prepare(
+    `SELECT care_flags.id, care_flags.sighting_id, care_flags.kind, care_flags.note,
+            care_flags.status, care_flags.created_at, sightings.cat_type
+     FROM care_flags JOIN sightings ON sightings.id=care_flags.sighting_id
+     WHERE care_flags.user_id=? ORDER BY care_flags.created_at DESC LIMIT 100`,
+  ).bind(user.id).all();
+  return json({ flags: rows.results.map((row) => ({
+    id: row.id,
+    sightingId: row.sighting_id,
+    catType: row.cat_type || "Cat sighting",
+    kind: row.kind,
+    note: row.note,
+    status: row.status,
+    createdAt: row.created_at,
+  })) });
+}
+
+async function updateProfile(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json();
+  const displayName = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 80) : null;
+  const timeZone = typeof body.timeZone === "string" && body.timeZone.length <= 80 ? body.timeZone : "Asia/Manila";
+  const language = ["en", "fil", "es", "ja"].includes(body.language) ? body.language : "en";
+  await env.DB.prepare(
+    `UPDATE users SET display_name=COALESCE(?, display_name), time_zone=?, language=?, updated_at=? WHERE id=?`,
+  ).bind(displayName, timeZone, language, now(), user.id).run();
+  await writeAudit(env, user.id, "profile.updated", "user", user.id, { timeZone, language });
+  const profile = await env.DB.prepare("SELECT id,email,display_name,time_zone,language FROM users WHERE id=?").bind(user.id).first();
+  return json({ user: profile });
+}
+
 async function createSighting(request, env) {
   const user = await requireUser(request, env);
   const form = await request.formData();
@@ -231,7 +294,10 @@ async function api(request, env, url) {
   }
   if (url.pathname === "/api/sightings" && request.method === "GET") return json({ sightings: await getSightings(request, env) });
   if (url.pathname === "/api/sightings" && request.method === "POST") return createSighting(request, env);
+  if (url.pathname === "/api/journal" && request.method === "GET") return getJournal(request, env);
+  if (url.pathname === "/api/care-flags" && request.method === "GET") return getCareFlags(request, env);
   if (url.pathname === "/api/care-flags" && request.method === "POST") return createCareFlag(request, env);
+  if (url.pathname === "/api/profile" && request.method === "PATCH") return updateProfile(request, env);
   if (url.pathname === "/api/reports" && request.method === "POST") return createReport(request, env);
   if (url.pathname === "/api/export" && request.method === "POST") return exportUser(request, env);
   if (url.pathname === "/api/account" && request.method === "DELETE") return deleteUser(request, env);
