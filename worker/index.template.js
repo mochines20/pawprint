@@ -106,13 +106,15 @@ async function getSightings(request, env) {
   const current = now();
   const rows = user
     ? await env.DB.prepare(
-      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility
+      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility,
+              EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings
        WHERE validation_status='accepted' AND published_at <= ? AND expires_at > ? AND (visibility='public' OR user_id=?)
        ORDER BY captured_at DESC LIMIT 200`,
     ).bind(current, current, user.id).all()
     : await env.DB.prepare(
-      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility
+      `SELECT id, user_id, cat_type, public_geohash, captured_at, expires_at, visibility,
+              EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings WHERE validation_status='accepted' AND visibility='public' AND published_at <= ? AND expires_at > ?
        ORDER BY captured_at DESC LIMIT 200`,
     ).bind(current, current).all();
@@ -122,6 +124,7 @@ async function getSightings(request, env) {
     area: geohashCenter(row.public_geohash),
     capturedAt: row.captured_at,
     expiresAt: row.expires_at,
+    emergency: Boolean(row.emergency),
   }));
 }
 
