@@ -13,12 +13,16 @@ function json(data, status = 200) {
 }
 
 function userFrom(request) {
-  const id = request.headers.get("oai-authenticated-user-id");
+  const decodeHeader = (value) => {
+    if (!value) return null;
+    try { return decodeURIComponent(value); } catch { return value; }
+  };
+  const id = decodeHeader(request.headers.get("oai-authenticated-user-id"));
   if (!id) return null;
   return {
     id,
-    email: request.headers.get("oai-authenticated-user-email") || null,
-    name: request.headers.get("oai-authenticated-user-full-name") || null,
+    email: decodeHeader(request.headers.get("oai-authenticated-user-email")),
+    name: decodeHeader(request.headers.get("oai-authenticated-user-full-name")),
   };
 }
 
