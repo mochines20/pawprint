@@ -262,7 +262,7 @@ const server = createServer(async (request, response) => {
     const sightingId = `preview-sighting-${Date.now()}`;
     const catType = ["Orange tabby", "Tuxedo", "Gray cat", "Calico", "Black cat"][previewState.journal.length % 5];
     const capturedAt = new Date().toISOString();
-    const sighting = { id: sightingId, catType, catBreed: "Preview classification", coatType: "Preview coat", catConfidence: 0.99, validationStatus: "accepted", visibility: "friends", capturedAt, expiresAt: new Date(Date.now() + 86400000).toISOString(), area: { latitude: 14.5995, longitude: 120.9842, label: "Approximate Manila area" } };
+    const sighting = { id: sightingId, catType, catBreed: "Preview classification", coatType: "Preview coat", catConfidence: 0.99, validationStatus: "accepted", visibility: "friends", description: "A live preview sighting saved from the local browser flow.", photoUrl: "/assets/cat-tabby-paving.webp", capturedAt, expiresAt: new Date(Date.now() + 86400000).toISOString(), area: { latitude: 14.5995, longitude: 120.9842, label: "Approximate Manila area" } };
     previewState.sightings.unshift(sighting);
     previewState.journal.unshift({ id: `preview-journal-${Date.now()}`, sightingId, catType, spottedAt: capturedAt, firstSpotted: !previewState.journal.some((entry) => entry.catType === catType), visibility: "friends", validationStatus: "accepted", description: "A live preview sighting saved from the local browser flow.", catBreed: "Preview classification", coatType: "Preview coat", photoUrl: "/assets/cat-tabby-paving.webp", locationLabel: "Approximate Manila area · exact location hidden" });
     previewState.xp += 24;
