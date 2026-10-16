@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f1f2f4">
   <meta name="description" content="Pawprint is a calm, privacy-first way to spot street cats and help keep them safe.">
-  <meta property="og:title" content="Pawprint — Spot cats. Leave a trace.">
+  <meta property="og:title" content="Pawprint — Gotta spot ’em all.">
   <meta property="og:description" content="Photograph street cats, pin an approximate area, and build a private Cat Journal.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pawprint.madison88-0851.chatgpt.site/?utm_source=linkedin&utm_medium=social&utm_campaign=sneak_peek">
   <meta property="og:image" content="https://pawprint.madison88-0851.chatgpt.site/assets/pawprint-sneakpeek.svg">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Pawprint — Spot cats. Leave a trace.">
+  <meta name="twitter:title" content="Pawprint — Gotta spot ’em all.">
   <meta name="twitter:description" content="A safer, delayed, approximate cat map with a private Cat Journal.">
   <link rel="canonical" href="https://pawprint.madison88-0851.chatgpt.site/">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <title>Pawprint — Spot cats. Leave a trace.</title>
+  <title>Pawprint — Gotta spot ’em all.</title>
   <style>
     :root { --ink:#171717; --muted:#8b8e94; --soft:#f1f2f4; --line:#e6e7e9; --white:#fff; --amber:#ffb815; --care:#e55745; --radius:28px; --font-body:"Poppins",ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif; --font-display:"Nunito",ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif; --font:var(--font-body); }
     *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;overflow-x:hidden;color:var(--ink);background:var(--soft);font-family:var(--font);font-size:16px;line-height:1.45} button,a{font:inherit} button{cursor:pointer} a{color:inherit;text-decoration:none} button:focus-visible,a:focus-visible{outline:3px solid var(--amber);outline-offset:3px}.shell{width:min(1160px,calc(100% - 40px));margin:0 auto}.skip-link{position:absolute;left:-999px;top:8px;z-index:50}.skip-link:focus{left:8px;background:#fff;padding:8px 12px;border-radius:10px}
@@ -919,6 +919,10 @@
   <script>
     (()=>{
       const applyClearLabels=()=>{
+        const tagline='Gotta spot ’em all.';
+        document.title=`Pawprint — ${tagline}`;
+        document.querySelectorAll('meta[property="og:title"],meta[name="twitter:title"]').forEach(meta=>{if(meta.content!==`Pawprint — ${tagline}`)meta.content=`Pawprint — ${tagline}`});
+        const footerTagline=document.querySelector('footer .footer-row span');if(footerTagline)footerTagline.innerHTML=`<b>Pawprint</b> · ${tagline}`;
         const navLabels={journal:'Cat Journal',care:'Care & help',more:'More tools'};
         document.querySelectorAll('[data-screen]').forEach(button=>{const key=button.dataset.screen,icon=button.querySelector('.side-icon');if(icon&&navLabels[key]&&button.lastChild&&button.lastChild.textContent!==navLabels[key])button.lastChild.textContent=navLabels[key]});
         const captureTitle=document.getElementById('captureTitle');if(captureTitle&&captureTitle.textContent!=='Record a cat sighting')captureTitle.textContent='Record a cat sighting';
