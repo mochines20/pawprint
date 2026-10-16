@@ -72,107 +72,12 @@ async function requireUser(request, env) {
 }
 
 async function ensureRuntimeTables(env) {
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS capture_sessions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      device_time_zone TEXT NOT NULL DEFAULT 'Asia/Manila',
-      camera_permission TEXT NOT NULL,
-      location_permission TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      used_at TEXT,
-      created_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS reward_ledger (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      sighting_id TEXT NOT NULL REFERENCES sightings(id),
-      kind TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      created_at TEXT NOT NULL,
-      UNIQUE(user_id, sighting_id, kind)
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_settings (
-      user_id TEXT PRIMARY KEY REFERENCES users(id),
-      default_visibility TEXT NOT NULL DEFAULT 'friends',
-      show_age_group INTEGER NOT NULL DEFAULT 0,
-      allow_friend_requests INTEGER NOT NULL DEFAULT 1,
-      notification_preference TEXT NOT NULL DEFAULT 'included',
-      updated_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS request_keys (
-      user_id TEXT NOT NULL REFERENCES users(id),
-      request_key TEXT NOT NULL,
-      response_json TEXT,
-      created_at TEXT NOT NULL,
-      PRIMARY KEY(user_id, request_key)
-    )`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS capture_sessions_user_idx ON capture_sessions (user_id, created_at DESC)"),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS reward_ledger_user_idx ON reward_ledger (user_id, created_at DESC)"),
-  ]);
-  // Keep existing installations compatible with the richer capture flow.
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN description TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE users ADD COLUMN age_group TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN barangay_name TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN city_name TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN country_name TEXT NOT NULL DEFAULT 'Philippines'").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_confidence REAL").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN cat_breed TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN coat_type TEXT").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN cat_confidence REAL").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_generated_confidence REAL").run(); } catch { /* column already exists */ }
-  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN validation_json TEXT").run(); } catch { /* column already exists */ }
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS notifications (
-      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), type TEXT NOT NULL,
-      title TEXT NOT NULL, body TEXT NOT NULL, read_at TEXT, created_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_badges (
-      user_id TEXT NOT NULL REFERENCES users(id), badge_id TEXT NOT NULL, earned_at TEXT NOT NULL,
-      PRIMARY KEY(user_id, badge_id)
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS quests (
-      id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL,
-      target INTEGER NOT NULL DEFAULT 1, kind TEXT NOT NULL, starts_at TEXT NOT NULL, ends_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS quest_progress (
-      user_id TEXT NOT NULL REFERENCES users(id), quest_id TEXT NOT NULL REFERENCES quests(id),
-      count INTEGER NOT NULL DEFAULT 0, completed_at TEXT, updated_at TEXT NOT NULL,
-      PRIMARY KEY(user_id, quest_id)
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS community_assets (
-      id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, description TEXT,
-      latitude REAL, longitude REAL, public_geohash TEXT, area_name TEXT, contact TEXT,
-      verified INTEGER NOT NULL DEFAULT 0, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS rescue_requests (
-      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), sighting_id TEXT,
-      need TEXT NOT NULL, note TEXT, public_geohash TEXT, status TEXT NOT NULL DEFAULT 'open',
-      created_at TEXT NOT NULL, resolved_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS moderation_queue (
-      id TEXT PRIMARY KEY, target_type TEXT NOT NULL, target_id TEXT NOT NULL, reason TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'open', assigned_to TEXT, action TEXT, created_at TEXT NOT NULL, resolved_at TEXT
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS partner_reports (
-      id TEXT PRIMARY KEY, partner_name TEXT NOT NULL, period_start TEXT NOT NULL, period_end TEXT NOT NULL,
-      payload_json TEXT NOT NULL, created_by TEXT REFERENCES users(id), created_at TEXT NOT NULL
-    )`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS waitlist_signups (
-      id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, platform_interest TEXT NOT NULL DEFAULT 'ios_android',
-      source TEXT, created_at TEXT NOT NULL
-    )`),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (user_id, created_at DESC)"),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS community_assets_kind_idx ON community_assets (kind, created_at DESC)"),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS rescue_status_idx ON rescue_requests (status, created_at DESC)"),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS moderation_status_idx ON moderation_queue (status, created_at DESC)"),
-  ]);
-  const today = localDay("UTC");
-  const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString();
-  await env.DB.prepare(`INSERT OR IGNORE INTO quests (id,slug,title,description,target,kind,starts_at,ends_at) VALUES (?,?,?,?,?,?,?)`)
-    .bind("quest-daily-pawprint", "daily-pawprint", "Daily Pawprint", "Log one safe cat sighting today.", 1, "sighting", `${today}T00:00:00.000Z`, weekEnd).run();
+  // D1 schema is provisioned by drizzle migrations before the Worker is
+  // deployed. Never run CREATE/ALTER TABLE on an authenticated request:
+  // dashboard, map, journal, and profile requests arrive concurrently and
+  // D1 can reject those competing schema writes with a 500. Keep this hook
+  // for call-site compatibility; schema changes belong in drizzle migrations.
+  return env;
 }
 
 const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Super Rare"];
