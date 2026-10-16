@@ -176,7 +176,7 @@ function onboardingMarkup() {
       <details class="auth-privacy"><summary>Privacy notice · Philippine Data Privacy Act of 2012 (RA 10173)</summary><ul><li>Your email and password stay with Supabase Auth. Pawprint stores only your chosen nickname, cat avatar, age group, and privacy-consent record for this profile.</li><li>Location is requested only when you start a cat capture and only after device permission. We do not silently track, edit, sell, or publicly reveal your exact location. Public pins use an approximate area, wait at least 5 minutes, and expire after 24 hours.</li><li>Photos are re-encoded before storage or sharing to remove GPS metadata. Do not upload people, private documents, or anything you do not have permission to share.</li><li>You may ask to access, correct, export, or delete your data, or withdraw consent where applicable. Some records may be retained when required for safety or law.</li></ul><p><a href="#privacy">Read the plain-language Privacy section</a> or contact Pawprint with a privacy concern.</p></details>
       <label class="auth-legal"><input id="pawprintAgeConfirm" type="checkbox" required><span>I confirm that I meet Pawprint's minimum age requirement and will use the app safely.</span></label>
       <label class="auth-legal"><input id="pawprintPrivacyConsent" name="privacyConsent" type="checkbox" value="yes" required><span>I have read this notice and consent to the described processing under RA 10173.</span></label>
-      <button class="auth-submit" type="submit">Save my profile</button>
+      <button class="auth-submit" type="submit">Finish profile setup</button>
     </form><p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite"></p>`;
 }
 
