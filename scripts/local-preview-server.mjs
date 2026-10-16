@@ -62,6 +62,29 @@ const previewState = {
   community: [],
 };
 function previewLevel(xp) { return Math.max(1, Math.floor(Math.sqrt(Math.max(0, Number(xp || 0)) / 100)) + 1); }
+function previewStreakDecision(forceBroken = false) {
+  const timeZone = "Asia/Manila";
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const todayDate = new Date(`${today}T00:00:00Z`);
+  const activeDays = new Set(previewState.journal.map((entry) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(entry.spottedAt))));
+  const days = [];
+  for (let offset = -3; offset <= 3; offset += 1) {
+    const date = new Date(todayDate);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const key = date.toISOString().slice(0, 10);
+    const complete = activeDays.has(key);
+    days.push({ key, label: new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(date), number: date.getUTCDate(), status: complete ? "complete" : key === today ? "today" : "empty", isToday: key === today });
+  }
+  return {
+    today,
+    active: !forceBroken && previewState.currentStreak > 0,
+    broken: forceBroken || previewState.currentStreak <= 0,
+    state: !forceBroken && previewState.currentStreak > 0 ? "active" : "broken",
+    label: !forceBroken && previewState.currentStreak > 0 ? "Orange cat streak" : "Black cat reset",
+    helper: !forceBroken && previewState.currentStreak > 0 ? "Validated pawprints keep it glowing." : "Validate a cat photo to restart your streak.",
+    days,
+  };
+}
 function previewProgress() {
   const medals = [
     ["xp-paw-seed", "Paw Seed", "Your first little mark on the Pawprint trail.", 0, "mist"],
@@ -153,7 +176,9 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (url.pathname === "/api/dashboard" && request.method === "GET") {
-    sendJson(response, { streak: { current: previewState.currentStreak, best: previewState.bestStreak }, journal: { unique: previewState.journal.filter((entry) => entry.firstSpotted).length }, xp: previewState.xp, sightings: previewState.sightings, demo: true });
+    const forceBroken = url.searchParams.get("streak") === "broken";
+    const decision = previewStreakDecision(forceBroken);
+    sendJson(response, { streak: { current: forceBroken ? 0 : previewState.currentStreak, best: previewState.bestStreak, freezes: 1, ...decision }, streakCalendar: decision.days, today: { key: decision.today, validated: !forceBroken && decision.days.some((day) => day.key === decision.today && day.status === "complete") }, journal: { unique: previewState.journal.filter((entry) => entry.firstSpotted).length }, xp: previewState.xp, sightings: previewState.sightings, demo: true });
     return;
   }
   if (url.pathname === "/api/progress" && request.method === "GET") {

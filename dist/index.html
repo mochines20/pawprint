@@ -1013,7 +1013,7 @@
         tools.innerHTML=`<div class="${badgeClass}" data-streak-badge role="status"><span class="streak-cat-badge${active?'':' is-broken'}" aria-hidden="true">${catMarkup(active)}</span><span class="streak-decision-copy"><strong>${escapeValue(streak.label|| (active?'Orange cat streak':'Black cat reset'))}</strong><small>${escapeValue(active?(streak.current||0)+' day streak · '+(streak.helper||'Keep it going.'):(streak.helper||'Validate a cat photo to restart your streak.'))}</small></span></div><div class="mobile-day-strip" aria-label="Your validated cat streak for this week">${dayMarkup||'<span class="mobile-day today is-missed">Today<b>—</b></span>'}</div>`;
         if(shouldPop)window.setTimeout(()=>tools.querySelector('[data-streak-badge]')?.classList.remove('pop'),850);
       };
-      const refresh=async()=>{if(!document.body.classList.contains('is-app'))return;try{const response=await fetch('/api/dashboard',{credentials:'include'});if(!response.ok)return;render(await response.json())}catch{}};
+      const refresh=async()=>{if(!document.body.classList.contains('is-app'))return;try{const requestedDemoState=new URLSearchParams(location.search).get('streak');const endpoint=location.hostname==='localhost'&&requestedDemoState==='broken'?'/api/dashboard?streak=broken':'/api/dashboard';const response=await fetch(endpoint,{credentials:'include'});if(!response.ok)return;render(await response.json())}catch{}};
       window.pawprintRenderStreakDecision=render;
       const original=window.loadDashboard;
       if(original)window.loadDashboard=async()=>{const result=await original();await refresh();return result};
