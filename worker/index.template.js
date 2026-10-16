@@ -5,8 +5,17 @@ const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
 const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
 const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
 const SUPABASE_AUTH_JS = __PAWPRINT_SUPABASE_AUTH_JS__;
+const PAW_LOADER_JS = __PAWPRINT_PAW_LOADER_JS__;
+const PAWLOADER_ACTUAL_JS = __PAWPRINT_PAWLOADER_ACTUAL_JS__;
+const PAWLOADER_CSS = __PAWPRINT_PAWLOADER_CSS__;
+const PAWLOADER_BRIDGE = __PAWPRINT_PAWLOADER_BRIDGE__;
+const PAWTRAIL_JS = __PAWPRINT_PAWTRAIL_JS__;
+const MOBILE_UI_JS = __PAWPRINT_MOBILE_UI_JS__;
+const MOBILE_UI_CSS = __PAWPRINT_MOBILE_UI_CSS__;
+const MOBILE_FONT = __PAWPRINT_MOBILE_FONT__;
+const MOBILE_FONT_LICENSE = __PAWPRINT_MOBILE_FONT_LICENSE__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Gotta spot ’em all—safely.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
-const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v6'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
+const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v8-reference-ui'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -526,6 +535,7 @@ async function getJournal(request, env) {
       id: row.id,
       sightingId: row.sighting_id,
       catType: row.cat_type || "Unclassified cat",
+      rarity: row.cat_type ? rarityFor(row.cat_type) : null,
       spottedAt: row.spotted_at,
       firstSpotted: Boolean(row.first_spotted),
       visibility: row.visibility,
@@ -1110,6 +1120,33 @@ export default {
       }
       if (request.method === "GET" && ["/assets/supabase-auth.js", "/assets/supabase-auth-gate.js"].includes(url.pathname)) {
         return new Response(SUPABASE_AUTH_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/paw-loader.js") {
+        return new Response(PAW_LOADER_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/mobile-ui.js") {
+        return new Response(MOBILE_UI_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawtrail.js") {
+        return new Response(PAWTRAIL_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/fredoka-latin.woff2") {
+        return new Response(Uint8Array.from(atob(MOBILE_FONT), c => c.charCodeAt(0)), { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/Fredoka-OFL.txt") {
+        return new Response(MOBILE_FONT_LICENSE, { headers: { "content-type": "text/plain; charset=utf-8" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/mobile-ui.css") {
+        return new Response(MOBILE_UI_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawloader.js") {
+        return new Response(PAWLOADER_ACTUAL_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawloader.css") {
+        return new Response(PAWLOADER_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawloader-bridge.js") {
+        return new Response(PAWLOADER_BRIDGE, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/auth/callback" || url.pathname === "/onboarding")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });

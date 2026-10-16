@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pawprint · mobile product mockup</title>
+  <style>
+    :root {
+      --ink: #151515;
+      --paper: #FAF8F4;
+      --stone: #8C8A84;
+      --line: #E4E1DA;
+      --amber: #FFB400;
+      --care: #D9402B;
+      --muted: #6f6d68;
+      --font: Fredoka, ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #f1f0ed; font-family: var(--font); overflow-x: hidden; }
+    button, a { font: inherit; }
+    a { color: inherit; }
+    .page { width: min(1260px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 70px; }
+    .masthead { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+    .eyebrow { color: var(--stone); font-size: .72rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 650px; margin: 9px 0 0; font-size: clamp(2rem, 5vw, 4.5rem); line-height: .92; letter-spacing: -.075em; }
+    .intro { max-width: 490px; margin: 12px 0 0; color: var(--muted); font-size: .96rem; line-height: 1.5; }
+    .open-link { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--amber); box-shadow: 3px 4px 0 var(--ink); text-decoration: none; font-weight: 900; white-space: nowrap; }
+    .mockup-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; align-items: start; }
+    .screen-card { min-width: 0; }
+    .screen-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 35px; margin-bottom: 9px; color: var(--muted); font-size: .75rem; font-weight: 900; }
+    .screen-label span:last-child { color: var(--stone); font-size: .66rem; font-weight: 700; }
+    .phone { position: relative; height: 650px; overflow: hidden; border: 7px solid var(--ink); border-radius: 35px; background: var(--paper); box-shadow: 7px 8px 0 var(--ink); }
+    .phone:before { content: ""; position: absolute; top: 0; left: 50%; z-index: 3; width: 82px; height: 20px; border-radius: 0 0 14px 14px; background: var(--ink); transform: translateX(-50%); }
+    .phone-inner { height: 100%; padding: 31px 15px 30px; overflow: hidden; }
+    .phone-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 17px; font-size: .68rem; font-weight: 900; }
+    .mini-mark { display: grid; place-items: center; width: 27px; height: 27px; border: 1px solid var(--line); border-radius: 9px; background: #fff; font-size: .85rem; }
+    .top-action { color: var(--stone); font-size: .67rem; }
+    .screen-kicker { color: var(--stone); font-size: .57rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .screen-title { margin: 4px 0 2px; font-size: 1.72rem; line-height: .95; letter-spacing: -.075em; }
+    .screen-subtitle { margin: 0; color: var(--stone); font-size: .68rem; line-height: 1.35; }
+    .map { position: relative; height: 235px; margin: 16px 0 10px; overflow: hidden; border: 1px solid #d8d5ce; border-radius: 20px; background: #e9e8e4; background-image: linear-gradient(28deg, transparent 45%, #d1d0cb 46%, #d1d0cb 47%, transparent 48%), linear-gradient(151deg, transparent 46%, #d1d0cb 47%, #d1d0cb 48%, transparent 49%), linear-gradient(90deg, transparent 48%, #d7d5cf 49%, #d7d5cf 50%, transparent 51%); background-size: 95px 95px, 125px 125px, 70px 70px; }
+    .map:after { content: "MANILA"; position: absolute; right: 14px; bottom: 42px; color: #aaa8a2; font-size: .55rem; font-weight: 900; letter-spacing: .08em; }
+    .map-title { position: absolute; top: 12px; left: 13px; z-index: 1; padding: 5px 8px; border-radius: 8px; background: rgba(250,248,244,.88); font-size: .58rem; font-weight: 900; }
+    .map-pin { position: absolute; display: grid; place-items: center; width: 31px; height: 37px; border: 2px solid var(--ink); border-radius: 50% 50% 50% 4px; background: var(--amber); box-shadow: 2px 3px 0 var(--ink); transform: rotate(-45deg); }
+    .map-pin i { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); }
+    .map-pin.one { top: 73px; left: 33%; }
+    .map-pin.two { top: 136px; right: 22%; background: #fff; }
+    .map-pin.three { bottom: 25px; left: 58%; background: #d8b25c; }
+    .map-privacy { position: absolute; right: 10px; bottom: 11px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.91); color: var(--stone); font-size: .48rem; font-weight: 800; }
+    .primary { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 42px; border: 2px solid var(--ink); border-radius: 14px; background: var(--amber); box-shadow: 0 4px 0 var(--ink); color: var(--ink); font-size: .76rem; font-weight: 900; }
+    .primary:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
+    .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .dark-card { padding: 14px; border-radius: 18px; background: var(--ink); color: #fff; }
+    .dark-card small { display: block; color: #a9a7a1; font-size: .58rem; }
+    .dark-card strong { display: block; margin: 5px 0 2px; color: var(--amber); font-size: 2.1rem; line-height: .85; letter-spacing: -.08em; }
+    .dark-card p { margin: 0; color: #d6d3cd; font-size: .54rem; }
+    .goal { padding: 13px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+    .goal b { display: block; font-size: .7rem; }
+    .goal span { display: flex; justify-content: space-between; margin-top: 10px; color: var(--stone); font-size: .55rem; }
+    .progress { height: 6px; margin-top: 6px; border-radius: 99px; background: #eceae5; overflow: hidden; }
+    .progress i { display: block; width: 68%; height: 100%; border-radius: inherit; background: var(--amber); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin: 17px 0 8px; font-size: .72rem; }
+    .section-head small { color: var(--stone); font-size: .55rem; }
+    .empty-note { padding: 15px 11px; border: 1px dashed #c9c5bc; border-radius: 14px; color: var(--stone); text-align: center; font-size: .62rem; }
+    .bottom-nav { position: absolute; right: 11px; bottom: 9px; left: 11px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 7px 4px; border-radius: 16px; background: var(--ink); box-shadow: 0 5px 0 #000; color: #aaa7a0; }
+    .bottom-nav span { display: grid; gap: 2px; place-items: center; font-size: .92rem; }
+    .bottom-nav small { font-size: .46rem; font-weight: 900; }
+    .bottom-nav .active { color: #fff; }
+    .capture { display: grid; place-items: center; height: 235px; margin: 18px 0 12px; border: 2px dashed #c7c3ba; border-radius: 22px; background: #ecebe7; }
+    .cat-sketch { position: relative; width: 105px; height: 95px; border: 4px solid var(--ink); border-radius: 48% 48% 44% 44%; background: var(--ink); }
+    .cat-sketch:before, .cat-sketch:after { content: ""; position: absolute; top: -27px; width: 43px; height: 39px; border: 4px solid var(--ink); background: var(--ink); }
+    .cat-sketch:before { left: -2px; border-radius: 4px 30px 3px 30px; transform: rotate(-14deg); }
+    .cat-sketch:after { right: -2px; border-radius: 30px 4px 30px 3px; transform: rotate(14deg); }
+    .cat-eyes { position: absolute; top: 37px; left: 26px; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); box-shadow: 37px 0 0 var(--amber); }
+    .cat-mouth { position: absolute; bottom: 19px; left: 43px; width: 18px; height: 8px; border-bottom: 3px solid var(--amber); border-radius: 50%; }
+    .privacy-note { display: flex; gap: 8px; margin: 12px 0; padding: 11px; border-radius: 14px; background: #fff1c9; color: #725600; font-size: .59rem; line-height: 1.35; }
+    .privacy-note b { color: var(--ink); }
+    .status-line { display: flex; align-items: center; gap: 7px; color: var(--stone); font-size: .58rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #54a36f; box-shadow: 0 0 0 3px #d8efdd; }
+    .chips { display: flex; gap: 6px; margin: 14px 0; overflow: hidden; }
+    .chip { padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--stone); font-size: .55rem; font-weight: 900; white-space: nowrap; }
+    .chip.active { border-color: var(--ink); background: var(--ink); color: #fff; }
+    .journal-list { display: grid; gap: 7px; }
+    .journal-row { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .cat-avatar { display: grid; place-items: center; flex: 0 0 31px; width: 31px; height: 31px; border-radius: 10px; background: #eeece7; font-size: 1rem; }
+    .journal-row strong { display: block; font-size: .62rem; }
+    .journal-row small { display: block; margin-top: 2px; color: var(--stone); font-size: .49rem; }
+    .rarity { margin-left: auto; color: #9b6900; font-size: .5rem; font-weight: 900; }
+    .streak-badge { display: flex; align-items: center; gap: 10px; margin: 14px 0; padding: 12px; border-radius: 17px; background: var(--ink); color: #fff; }
+    .streak-cat { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 13px; background: var(--amber); font-size: 1.18rem; }
+    .streak-badge strong { display: block; font-size: .71rem; }
+    .streak-badge small { display: block; margin-top: 2px; color: #bcb9b1; font-size: .51rem; }
+    .profile-center { text-align: center; }
+    .large-avatar { display: grid; place-items: center; width: 67px; height: 67px; margin: 5px auto 9px; border: 3px solid var(--ink); border-radius: 23px; background: var(--amber); box-shadow: 4px 4px 0 var(--ink); font-size: 1.9rem; }
+    .profile-center strong { display: block; font-size: .86rem; }
+    .profile-center small { color: var(--stone); font-size: .56rem; }
+    .xp-card { margin: 18px 0 12px; padding: 15px; border-radius: 18px; background: var(--ink); color: #fff; }
+    .xp-card span { color: #a9a7a1; font-size: .56rem; }
+    .xp-card b { display: block; margin: 4px 0; color: var(--amber); font-size: 2rem; line-height: .9; letter-spacing: -.08em; }
+    .xp-card small { color: #d6d3cd; font-size: .54rem; }
+    .medal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 9px; }
+    .medal { display: grid; place-items: center; gap: 4px; min-height: 65px; padding: 7px 3px; border: 1px solid var(--line); border-radius: 13px; background: #fff; text-align: center; }
+    .medal-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 50%; background: var(--amber); font-size: .9rem; }
+    .medal.locked .medal-icon { background: #e8e5dd; filter: grayscale(1); opacity: .75; }
+    .medal small { color: var(--stone); font-size: .43rem; font-weight: 900; }
+    .settings-row { display: flex; justify-content: space-between; padding: 10px 2px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .62rem; }
+    .settings-row b { color: var(--ink); }
+    .footer-note { margin-top: 23px; color: var(--stone); text-align: center; font-size: .72rem; }
+    .download-panel { margin: 34px 0 8px; padding: 20px; border: 2px solid var(--ink); border-radius: 24px; background: var(--amber); box-shadow: 5px 6px 0 var(--ink); }
+    .download-panel h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.05em; }
+    .download-panel p { margin: 5px 0 14px; color: #654d00; font-size: .8rem; }
+    .download-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .download-card { display: grid; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--ink); border-radius: 15px; background: var(--paper); text-decoration: none; }
+    .download-card img { display: block; width: 100%; border-radius: 9px; }
+    .download-card strong { font-size: .7rem; }
+    .download-card span { color: var(--stone); font-size: .62rem; font-weight: 800; }
+    .download-status { min-height: 18px; margin-top: 12px !important; color: #654d00 !important; font-size: .72rem !important; font-weight: 800; }
+    @media (max-width: 1100px) { .mockup-grid { grid-template-columns: repeat(2, minmax(240px, 1fr)); max-width: 680px; margin: 0 auto; } .masthead { align-items: start; flex-direction: column; } }
+    @media (max-width: 650px) { .page { width: min(100% - 22px, 360px); padding-top: 22px; } .mockup-grid { grid-template-columns: minmax(0, 1fr); max-width: 300px; margin: 0 auto; } .phone { height: 620px; } .masthead { margin-bottom: 20px; } .open-link { width: 100%; } }
+    @media (max-width: 650px) { .download-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="masthead">
+      <div>
+        <div class="eyebrow">Pawprint · mobile product mockup</div>
+        <h1>Gotta spot ’em all.</h1>
+        <p class="intro">Four connected screens for the browser-first experience: spot safely, validate the photo, collect the story, and keep your progress moving.</p>
+      </div>
+      <a class="open-link" href="/?demo=1#app">Open live preview ↗</a>
+    </header>
+
+    <section class="mockup-grid" aria-label="Pawprint mobile app screens">
+      <article class="screen-card">
+        <div class="screen-label"><span>01 · Home map</span><span>Spot &amp; pin</span></div>
+        <div class="phone">
+          <div class="phone-inner">
+            <div class="phone-top"><span class="mini-mark">🐾</span><span>Good morning, Mira</span><span class="top-action">⚙</span></div>
+            <div class="screen-kicker">Philippines · private by default</div>
+            <h2 class="screen-title">Welcome home</h2>
+            <p class="screen-subtitle">A calmer map for noticing cats in your neighborhood.</p>
+            <div class="map"><span class="map-title">My map · today</span><span class="map-pin one"><i></i></span><span class="map-pin two"><i></i></span><span class="map-pin three"><i></i></span><span class="map-privacy">Approximate pins · delayed</span></div>
+            <button class="primary" type="button" data-mock-submit="spot">＋ Spot a cat</button>
+            <div class="two-up"><div class="dark-card"><small>Current streak</small><strong>04</strong><p>days in a row</p></div><div class="goal"><b>Today’s small goal</b><span><i>Keep going</i><b>1/1</b></span><div class="progress"><i></i></div></div></div>
+            <div class="section-head"><b>Recent pawprints</b><small>View all</small></div>
+            <div class="empty-note">Your next validated sighting will appear here.</div>
+            <nav class="bottom-nav" aria-label="Home navigation"><span class="active">⌂<small>Home</small></span><span>♧<small>Journal</small></span><span>⚑<small>Care</small></span><span>♟<small>Profile</small></span></nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="screen-card">
+        <div class="screen-label"><span>02 · Spot a cat</span><span>Check first</span></div>
+        <div class="phone">
+          <div class="phone-inner">
+            <div class="phone-top"><span class="mini-mark">‹</span><span>New pawprint</span><span class="top-action">×</span></div>
+            <div class="screen-kicker">Private capture</div>
+            <h2 class="screen-title">Spot a cat</h2>
+            <p class="screen-subtitle">Take a fresh photo from a respectful distance. The system checks it before it enters your Journal.</p>
+            <div class="capture"><div class="cat-sketch" aria-hidden="true"><span class="cat-eyes"></span><span class="cat-mouth"></span></div></div>
+            <div class="status-line"><span class="dot"></span><b>Ready to check</b><span>· camera stays on your device until submit</span></div>
+            <div class="privacy-note"><b>⌖ Safe location</b><span>Your public pin is approximate and delayed. Exact capture coordinates stay private.</span></div>
+            <button class="primary" type="button" data-mock-submit="validate">Capture and verify</button>
+            <div class="section-head"><b>What happens next?</b></div>
+            <div class="empty-note">Cat check → duplicate check → safe pin → XP and streak.</div>
+            <nav class="bottom-nav" aria-label="Capture navigation"><span class="active">＋<small>Spot</small></span><span>⌂<small>Home</small></span><span>♧<small>Journal</small></span><span>♟<small>Profile</small></span></nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="screen-card">
+        <div class="screen-label"><span>03 · Cat Journal</span><span>Collect gently</span></div>
+        <div class="phone">
+          <div class="phone-inner">
+            <div class="phone-top"><span class="mini-mark">☰</span><span>Cat Journal</span><span class="top-action">⚙</span></div>
+            <div class="screen-kicker">Your private collection</div>
+            <h2 class="screen-title">Every cat has a story.</h2>
+            <p class="screen-subtitle">Saved sightings are yours. Friends only see what you choose to share.</p>
+            <div class="chips"><span class="chip active">All</span><span class="chip">Common</span><span class="chip">Rare</span></div>
+            <div class="journal-list">
+              <div class="journal-row"><span class="cat-avatar">🐈</span><span><strong>Orange tabby</strong><small>Oct 16 · approximate Manila area</small></span><em>common</em></div>
+              <div class="journal-row"><span class="cat-avatar">🐈‍⬛</span><span><strong>Tuxedo</strong><small>Oct 15 · private visibility</small></span><em>uncommon</em></div>
+              <div class="journal-row"><span class="cat-avatar">🐱</span><span><strong>Calico</strong><small>Oct 13 · friends visibility</small></span><em>rare</em></div>
+            </div>
+            <div class="streak-badge"><span class="streak-cat">🐈</span><span><strong>Orange cat streak · 4 days</strong><small>Validate one cat today to keep it glowing.</small></span></div>
+            <div class="section-head"><b>Collection progress</b><small>8 cats</small></div>
+            <div class="progress"><i style="width:45%"></i></div>
+            <nav class="bottom-nav" aria-label="Journal navigation"><span>⌂<small>Home</small></span><span class="active">♧<small>Journal</small></span><span>⚑<small>Care</small></span><span>♟<small>Profile</small></span></nav>
+          </div>
+        </div>
+      </article>
+
+      <article class="screen-card">
+        <div class="screen-label"><span>04 · Profile &amp; progress</span><span>Grow with care</span></div>
+        <div class="phone">
+          <div class="phone-inner">
+            <div class="phone-top"><span class="mini-mark">‹</span><span>My profile</span><span class="top-action">⚙</span></div>
+            <div class="profile-center"><div class="large-avatar">🐈‍⬛</div><strong>Mira’s Pawprint</strong><small>Account details stay private.</small></div>
+            <div class="xp-card"><span>Progress level 3</span><b>248 XP</b><small>Alley Scout · keep exploring with care.</small><div class="progress"><i style="width:72%"></i></div></div>
+            <div class="section-head"><b>Medals</b><small>3 earned</small></div>
+            <div class="medal-grid"><div class="medal"><span class="medal-icon">🐾</span><small>First Paw</small></div><div class="medal"><span class="medal-icon">🐈</span><small>Alley Scout</small></div><div class="medal locked"><span class="medal-icon">✦</span><small>Night Watcher</small></div></div>
+            <div class="section-head"><b>Privacy controls</b></div>
+            <div class="settings-row"><span>Public visibility</span><b>Friends ›</b></div>
+            <div class="settings-row"><span>Approximate map only</span><b>On</b></div>
+            <div class="settings-row"><span>Language</span><b>English ›</b></div>
+            <nav class="bottom-nav" aria-label="Profile navigation"><span>⌂<small>Home</small></span><span>♧<small>Journal</small></span><span>⚑<small>Care</small></span><span class="active">♟<small>Profile</small></span></nav>
+          </div>
+        </div>
+      </article>
+    </section>
+    <section class="download-panel" aria-labelledby="download-title">
+      <h2 id="download-title">Download the four screens</h2>
+      <p>Consistent Pawprint styling, ready for an App Builders PH listing or presentation.</p>
+      <div class="download-grid">
+        <a class="download-card" data-download href="/mockups/pawprint-home-map.png" download="pawprint-home-map.png"><img src="/mockups/pawprint-home-map.png" alt="Pawprint Home map mockup"><strong>Home map</strong><span>Download PNG ↓</span></a>
+        <a class="download-card" data-download href="/mockups/pawprint-spot-cat.png" download="pawprint-spot-cat.png"><img src="/mockups/pawprint-spot-cat.png" alt="Pawprint Spot a cat mockup"><strong>Spot a cat</strong><span>Download PNG ↓</span></a>
+        <a class="download-card" data-download href="/mockups/pawprint-cat-journal.png" download="pawprint-cat-journal.png"><img src="/mockups/pawprint-cat-journal.png" alt="Pawprint Cat Journal mockup"><strong>Cat Journal</strong><span>Download PNG ↓</span></a>
+        <a class="download-card" data-download href="/mockups/pawprint-profile-progress.png" download="pawprint-profile-progress.png"><img src="/mockups/pawprint-profile-progress.png" alt="Pawprint Profile and progress mockup"><strong>Profile</strong><span>Download PNG ↓</span></a>
+      </div>
+      <p id="downloadStatus" class="download-status" role="status" aria-live="polite">Click any screen to download its PNG.</p>
+    </section>
+    <p class="footer-note">Pawprint · Gotta spot ’em all. A browser-first product direction for Filipino cat spotters.</p>
+  </main>
+  <script src="/assets/paw-loader.js"></script>
+  <script>
+    document.querySelectorAll('[data-download]').forEach((link) => {
+      link.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const filename = link.getAttribute('download') || link.href.split('/').pop();
+        const status = document.getElementById('downloadStatus');
+        try {
+          const response = await fetch(link.href, { cache: 'no-store' });
+          if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          const saver = document.createElement('a');
+          saver.href = objectUrl;
+          saver.download = filename;
+          document.body.appendChild(saver);
+          saver.click();
+          saver.remove();
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          if (status) status.textContent = `${filename} downloaded.`;
+        } catch (error) {
+          if (status) status.textContent = 'Download could not start. Opening the PNG instead.';
+          window.open(link.href, '_blank', 'noopener');
+        }
+      });
+    });
+    document.querySelectorAll('[data-mock-submit]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (window.PawLoader?.button) {
+          await window.PawLoader.button(button, { variant: 'tap', label: button.dataset.mockSubmit === 'validate' ? 'Checking for a cat...' : 'Saving your pawprint...' }, async () => {
+            await new Promise((resolve) => setTimeout(resolve, 900));
+          });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PawLoader preview</title>
+  <style>
+    :root{--paw-ink:#151515;--paw-paper:#FAF8F4;--paw-stone:#8C8A84;--paw-line:#E4E1DA;--paw-amber:#FFB400;--paw-care:#D9402B;--font-display:Fredoka,ui-rounded,system-ui,sans-serif}
+    *{box-sizing:border-box}body{margin:0;padding:24px;background:var(--paw-paper);color:var(--paw-ink);font:500 15px/1.4 var(--font-display)}main{width:min(980px,100%);margin:auto}h1{margin:0 0 6px;font-size:clamp(2rem,6vw,3.6rem);letter-spacing:-.06em}p{margin:0;color:var(--paw-stone)}.preview-head{display:flex;justify-content:space-between;gap:18px;align-items:start;margin-bottom:22px}.preview-head button{border:2px solid var(--paw-ink);border-radius:999px;padding:10px 14px;background:var(--paw-amber);box-shadow:3px 3px 0 var(--paw-ink);font:800 12px var(--font-display);cursor:pointer}.preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.preview-card{display:grid;gap:14px;padding:18px;border:2px solid var(--paw-line);border-radius:22px;background:#fff}.preview-card h2{margin:0;font-size:1.05rem}.preview-card.dark{background:var(--paw-ink);color:var(--paw-paper);border-color:var(--paw-ink)}.preview-card.dark p{color:var(--paw-line)}.preview-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:center}.preview-cell{display:grid;justify-items:center;gap:4px;min-width:0}.preview-cell small{color:var(--paw-stone);font-size:11px}.preview-card.dark .preview-cell small{color:var(--paw-line)}.preview-cell paw-loader{width:100%;min-height:64px}.preview-card .pawloader[data-size="lg"]{min-height:140px}.preview-reduced .pawloader__animated{animation:preview-calm 1s ease-in-out infinite!important}@keyframes preview-calm{0%,100%{opacity:.55}50%{opacity:1}}@media(max-width:620px){body{padding:16px}.preview-head{display:block}.preview-head button{margin-top:14px}.preview-grid{grid-template-columns:1fr}.preview-card{padding:14px}}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="preview-head"><div><h1>PawLoader</h1><p>Three production states, three sizes, light and dark surfaces.</p></div><button id="reducedMotion" type="button" aria-pressed="false">Use calm motion</button></div>
+    <div id="previewGrid" class="preview-grid"></div>
+  </main>
+  <link rel="stylesheet" href="/assets/pawloader.css">
+  <script src="/assets/pawloader.js"></script>
+  <script src="/assets/pawloader-bridge.js"></script>
+  <script>
+    const grid=document.getElementById('previewGrid');
+    const variants=['paws','pin','tap'];
+    const sizes=['lg','md','sm'];
+    variants.forEach(variant=>['light','dark'].forEach(tone=>{
+      const card=document.createElement('section');card.className=`preview-card ${tone}`;card.dataset.tone=tone;card.dataset.theme=tone;
+      card.innerHTML=`<div><h2>${variant} · ${tone}</h2><p>Animation and contrast check</p></div><div class="preview-row"></div>`;
+      const row=card.querySelector('.preview-row');
+      sizes.forEach(size=>{const cell=document.createElement('div');cell.className='preview-cell';const label=variant==='tap'?(size==='sm'?'Saving…':'Saving'):'Checking for a cat…';cell.append(window.PawLoader.create({variant,size,tone,label,rotateLabel:false}));const caption=document.createElement('small');caption.textContent=size;cell.append(caption);row.append(cell)});
+      grid.append(card);
+    }));
+    document.getElementById('reducedMotion').addEventListener('click',event=>{const reduced=document.body.classList.toggle('preview-reduced');event.currentTarget.setAttribute('aria-pressed',String(reduced));event.currentTarget.textContent=reduced?'Use full motion':'Use calm motion';});
+  </script>
+</body>
+</html>

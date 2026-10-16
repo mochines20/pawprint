@@ -16,6 +16,8 @@ const contentTypes = {
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".webp": "image/webp",
+  ".woff2": "font/woff2",
+  ".txt": "text/plain; charset=utf-8",
 };
 let previewProfile = {
   display_name: "Pawprint spotter",
