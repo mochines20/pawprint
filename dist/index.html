@@ -381,6 +381,40 @@
   </style>
   <script>
     (()=>{
+      const reportSighting=async sightingId=>{
+        if(!sightingId)return;
+        const reason=window.prompt('Why are you reporting this pin? Choose: unsafe, privacy, spam, harassment, or other.','privacy');
+        if(!reason)return;
+        const normalized=String(reason).trim().toLowerCase();
+        const allowed=['unsafe','privacy','spam','harassment','other'];
+        const selected=allowed.includes(normalized)?normalized:'other';
+        try{
+          const response=await fetch('/api/reports',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({targetType:'sighting',targetId:sightingId,reason:selected})});
+          if(!response.ok)throw new Error('REPORT_FAILED');
+          window.notify?.('Report sent for community review.');
+        }catch{window.notify?.('Sign in to report a pin.');}
+      };
+      const enhanceMapPopup=()=>{
+        const popup=document.querySelector('.pawprint-popup'),item=window.__selectedMapSighting;
+        if(!popup||!item||item.isOwner||popup.querySelector('[data-report-sighting]'))return;
+        const button=document.createElement('button');button.type='button';button.className='popup-delete popup-report';button.dataset.reportSighting='1';button.textContent='Report this pin';button.addEventListener('click',()=>reportSighting(item.id));popup.appendChild(button);
+      };
+      const enhanceLocalLeaderboard=()=>{
+        const heading=[...document.querySelectorAll('#dashboard h3')].find(node=>node.textContent.trim().startsWith('Leaderboard'));
+        const card=heading?.closest('.more-card');
+        if(!card||card.querySelector('[data-leaderboard-scope]'))return;
+        const select=document.createElement('select');select.dataset.leaderboardScope='1';select.setAttribute('aria-label','Leaderboard area');select.innerHTML='<option value="barangay">My barangay</option><option value="city">My city</option><option value="country">Philippines</option>';select.style.cssText='margin:0 0 12px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-size:.72rem;font-weight:800';
+        const list=card.querySelector('.leader-list');card.insertBefore(select,list||null);select.addEventListener('change',async()=>{try{const response=await fetch(`/api/leaderboards?scope=${encodeURIComponent(select.value)}`,{credentials:'include'});const data=await response.json();if(list)list.innerHTML=(data.leaders||[]).map(row=>`<div class="leader-row"><span class="leader-rank">${row.rank}</span><span><strong>${String(row.name||'Pawprint spotter').replace(/[&<>\"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[char]))}</strong><small>${row.sightings} sightings · level ${row.level}</small></span><span class="entry-badge">${row.xp} XP</span></div>`).join('')||'<div class="empty-state">No safe sightings in this area yet.</div>';}catch{window.notify?.('Local leaderboard is unavailable right now.')}});
+      };
+      const observe=()=>{enhanceMapPopup();enhanceLocalLeaderboard();};
+      observe();
+      new MutationObserver(observe).observe(document.body,{childList:true,subtree:true});
+      window.addEventListener('offline',()=>window.notify?.('You are offline. New data will sync when the connection returns.'));
+      window.addEventListener('online',()=>window.notify?.('You are back online. Pawprint is ready to sync.'));
+    })();
+  </script>
+  <script>
+    (()=>{
       const dashboard=document.getElementById('dashboard'),title=document.getElementById('screenTitle'),body=document.body;
       let activeScreen='home',journalEntries=[],careFlags=[];
       const screenTitles={home:'Welcome home',journal:'Your Cat Journal',care:'Care for the community',profile:'My profile'};

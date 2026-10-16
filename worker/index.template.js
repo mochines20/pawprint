@@ -5,7 +5,7 @@ const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
 const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
 const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
 const SUPABASE_AUTH_JS = __PAWPRINT_SUPABASE_AUTH_JS__;
-const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Spot cats. Leave a safer trace.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
+const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Gotta spot ’em all—safely.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v3'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
@@ -520,9 +520,15 @@ async function createSighting(request, env) {
   if (existingRequest?.response_json) return new Response(existingRequest.response_json, { status: 201, headers: JSON_HEADERS });
   const session = await env.DB.prepare("SELECT id,device_time_zone,expires_at,used_at FROM capture_sessions WHERE id=? AND user_id=?").bind(captureSessionId, user.id).first();
   if (!session || session.used_at || new Date(session.expires_at) <= new Date()) return json({ error: "CAPTURE_SESSION_INVALID" }, 409);
-  const recent = await env.DB.prepare("SELECT COUNT(*) AS total FROM sightings WHERE user_id=? AND uploaded_at>? ").bind(user.id, new Date(Date.now() - 60 * 60 * 1000).toISOString()).first();
-  if (Number(recent?.total || 0) >= 30) return json({ error: "RATE_LIMITED" }, 429);
-  const capturedAt = now();
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS total FROM sightings WHERE user_id=? AND uploaded_at>? ").bind(user.id, new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()).first();
+  if (Number(recent?.total || 0) >= 20) return json({ error: "RATE_LIMITED" }, 429);
+  const clientCapturedAt = String(form.get("capturedAt") || "");
+  const clientCapturedMs = Date.parse(clientCapturedAt);
+  const uploadStartedMs = Date.now();
+  if (!Number.isFinite(clientCapturedMs) || clientCapturedMs > uploadStartedMs + 120000 || uploadStartedMs - clientCapturedMs > 10 * 60 * 1000) {
+    return json({ error: "CAPTURE_TIME_INVALID" }, 409);
+  }
+  const capturedAt = new Date(clientCapturedMs).toISOString();
   const bytes = new Uint8Array(await photo.arrayBuffer());
   const photoHash = await sha256(bytes);
   const duplicate = await env.DB.prepare("SELECT id FROM sightings WHERE photo_hash=? LIMIT 1").bind(photoHash).first();
@@ -541,9 +547,13 @@ async function createSighting(request, env) {
     sightingId, user.id, photoKey, photoHash, validation.catType, validation.catBreed, validation.coatType,
     validation.catConfidence ?? null, validation.catConfidence ?? null, validation.aiGenerated ? 1 : 0,
     validation.aiGeneratedConfidence ?? null, JSON.stringify(validation), description, validation.status, validation.reason,
-    visibility, latitude, longitude, encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(),
+    visibility, latitude, longitude, ["Rare", "Super Rare"].includes(rarityFor(validation.catType)) ? encodeGeohash(latitude, longitude, 4) : encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(),
     publishedAt.toISOString(), expiresAt.toISOString(), uploadedAt.toISOString(),
   ).run();
+  if (validation.status !== "accepted" || validation.personDetected || validation.screenshotDetected || validation.aiGenerated || validation.unsafe) {
+    await env.DB.prepare("INSERT INTO moderation_queue (id,target_type,target_id,reason,created_at) VALUES (?,?,?,?,?)")
+      .bind(id(), "sighting", sightingId, validation.reason || "VALIDATION_REVIEW", now()).run();
+  }
   let streak = null;
   if (validation.status === "accepted") {
     const previousCat = await env.DB.prepare("SELECT 1 FROM journal_entries WHERE user_id=? AND cat_type=? LIMIT 1").bind(user.id, validation.catType || "Unclassified cat").first();
@@ -617,6 +627,19 @@ async function createCareFlag(request, env) {
   await env.DB.prepare("INSERT INTO care_flags (id,user_id,sighting_id,kind,note,created_at) VALUES (?,?,?,?,?,?)").bind(careId, user.id, sighting.id, kind, typeof body.note === "string" ? body.note.slice(0, 500) : null, now()).run();
   await writeAudit(env, user.id, "care_flag.created", "care_flag", careId);
   return json({ careFlagId: careId, status: "open" }, 201);
+}
+
+async function resolveCareFlag(request, env, careFlagId) {
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const status = ["open", "helped", "dismissed"].includes(body.status) ? body.status : "helped";
+  const flag = await env.DB.prepare("SELECT id,user_id,sighting_id FROM care_flags WHERE id=? LIMIT 1").bind(careFlagId).first();
+  if (!flag) return json({ error: "CARE_FLAG_NOT_FOUND" }, 404);
+  await env.DB.prepare("UPDATE care_flags SET status=? WHERE id=?").bind(status, careFlagId).run();
+  await createNotification(env, flag.user_id, "care_update", status === "helped" ? "Cat care update" : "Care Flag updated", status === "helped" ? "A reviewer marked this Care Flag as helped. Thank you for looking out for a cat." : "A reviewer updated your Care Flag.");
+  await writeAudit(env, user.id, "care_flag.resolved", "care_flag", careFlagId, { status });
+  return json({ careFlagId, status });
 }
 
 async function createReport(request, env) {
@@ -825,7 +848,7 @@ async function getWrapped(request, env) {
 async function getShareCard(request, env) {
   const wrapped = await getWrapped(request, env);
   const payload = await wrapped.json();
-  return json({ card: { ...payload, brand: "Pawprint", tagline: "Spot cats. Leave a safer trace." } });
+  return json({ card: { ...payload, brand: "Pawprint", tagline: "Gotta spot ’em all.", shareTagline: "Spotted today. Gone tomorrow." } });
 }
 
 async function getAdminAnalytics(request, env) {
@@ -918,6 +941,7 @@ async function api(request, env, url) {
   if (url.pathname === "/api/admin/analytics" && request.method === "GET") return getAdminAnalytics(request, env);
   if (url.pathname === "/api/admin/moderation" && request.method === "GET") return getModerationQueue(request, env);
   if (url.pathname.startsWith("/api/admin/moderation/") && request.method === "POST") return resolveModeration(request, env, url.pathname.split("/").pop());
+  if (url.pathname.startsWith("/api/admin/care-flags/") && request.method === "PATCH") return resolveCareFlag(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/admin/partner-reports" && request.method === "GET") return getPartnerReports(request, env);
   if (url.pathname === "/api/admin/partner-reports" && request.method === "POST") return createPartnerReport(request, env);
   if (url.pathname === "/api/waitlist" && request.method === "POST") return createWaitlist(request, env);
