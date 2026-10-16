@@ -967,5 +967,60 @@
       new MutationObserver(applyClearLabels).observe(document.body,{childList:true,subtree:true});
     })();
   </script>
-</body>
+  <style id="streak-decision-styles">
+    .streak-decision{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:9px 11px;border:1px solid #ebe8e2;border-radius:16px;background:#fff}
+    .streak-cat-badge{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;background:#fff5d8;border:1px solid #ffd776;box-shadow:0 4px 0 #f3bd2b;transition:transform .2s ease,background .2s ease}
+    .streak-cat-badge.is-broken{background:#f0f0f0;border-color:#d9d9d9;box-shadow:0 4px 0 #c5c5c5;filter:grayscale(.2)}
+    .streak-cat-badge svg{width:31px;height:31px;display:block}
+    .streak-decision-copy{min-width:0;display:grid;gap:2px}
+    .streak-decision-copy strong{font-size:12px;line-height:1.1;color:#171717}
+    .streak-decision-copy small{font-size:10px;line-height:1.25;color:#7b7d85}
+    .streak-decision.pop .streak-cat-badge{animation:streakBadgePop .75s cubic-bezier(.2,.8,.2,1)}
+    .streak-day-check{display:block;font-size:10px;line-height:10px;color:#e49a00;font-weight:900;margin-top:2px}
+    .mobile-day{position:relative;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+    .mobile-day.is-complete{background:#fff7dc;border-color:#ffbf2d;color:#9a6500}
+    .mobile-day.is-complete b{color:#171717}
+    .mobile-day.is-freeze{background:#f4f1ff;border-color:#a999dc;color:#5a478d}
+    .mobile-day.is-missed{opacity:.58}
+    .mobile-day.is-today.is-complete{background:#171717;border-color:#171717;color:#ffcb3e}
+    .mobile-day.is-today.is-complete b{color:#fff}
+    @keyframes streakBadgePop{0%{transform:scale(.8) rotate(-7deg)}55%{transform:scale(1.12) rotate(4deg)}100%{transform:scale(1) rotate(0)}}
+    @media (prefers-reduced-motion:reduce){.streak-decision.pop .streak-cat-badge{animation:none}}
+  </style>
+  <script>
+    (()=>{
+      const dashboard=document.getElementById('dashboard');
+      if(!dashboard)return;
+      let previousCurrent=null,previousValidated=false;
+      const escapeValue=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+      const catMarkup=active=>window.pawprintAvatarMarkup?.(active?'cat-tangerine':'cat-ink')||`<span aria-hidden="true">${active?'🐈':'🐈‍⬛'}</span>`;
+      const render=payload=>{
+        const streak=payload?.streak||{};
+        const days=payload?.streakCalendar||[];
+        const active=Boolean(streak.active);
+        const validatedToday=Boolean(payload?.today?.validated);
+        const shouldPop=validatedToday&&!previousValidated||Number(streak.current||0)>Number(previousCurrent||0);
+        previousCurrent=Number(streak.current||0);previousValidated=validatedToday;
+        let tools=document.querySelector('.mobile-home-tools');
+        if(!tools){
+          const grid=dashboard.querySelector('.screen-panel .dashboard-grid');
+          if(!grid)return;
+          tools=document.createElement('div');tools.className='mobile-home-tools';grid.prepend(tools);
+        }
+        tools.dataset.streakState=active?'active':'broken';
+        const badgeClass=`streak-decision${active?'':' is-broken'}${shouldPop?' pop':''}`;
+        const dayMarkup=days.map(day=>`<span class="mobile-day ${day.status==='complete'?'is-complete ':''}${day.status==='freeze'?'is-freeze ':''}${day.status==='empty'?'is-missed ':''}${day.isToday?' today is-today':''}" data-streak-day="${escapeValue(day.key)}" aria-label="${escapeValue(day.label+' '+day.number+' '+day.status)}">${escapeValue(day.label)}<b>${escapeValue(day.number)}</b>${day.status==='complete'?'<i class="streak-day-check" aria-hidden="true">✓</i>':''}${day.status==='freeze'?'<i class="streak-day-check" aria-hidden="true">❄</i>':''}</span>`).join('');
+        tools.innerHTML=`<div class="${badgeClass}" data-streak-badge role="status"><span class="streak-cat-badge${active?'':' is-broken'}" aria-hidden="true">${catMarkup(active)}</span><span class="streak-decision-copy"><strong>${escapeValue(streak.label|| (active?'Orange cat streak':'Black cat reset'))}</strong><small>${escapeValue(active?(streak.current||0)+' day streak · '+(streak.helper||'Keep it going.'):(streak.helper||'Validate a cat photo to restart your streak.'))}</small></span></div><div class="mobile-day-strip" aria-label="Your validated cat streak for this week">${dayMarkup||'<span class="mobile-day today is-missed">Today<b>—</b></span>'}</div>`;
+        if(shouldPop)window.setTimeout(()=>tools.querySelector('[data-streak-badge]')?.classList.remove('pop'),850);
+      };
+      const refresh=async()=>{if(!document.body.classList.contains('is-app'))return;try{const response=await fetch('/api/dashboard',{credentials:'include'});if(!response.ok)return;render(await response.json())}catch{}};
+      window.pawprintRenderStreakDecision=render;
+      const original=window.loadDashboard;
+      if(original)window.loadDashboard=async()=>{const result=await original();await refresh();return result};
+      new MutationObserver(()=>{if(document.getElementById('screenTitle')?.textContent==='Welcome home')refresh()}).observe(dashboard,{childList:true,subtree:true});
+      window.addEventListener('hashchange',()=>setTimeout(refresh,80));
+      setTimeout(refresh,160);
+    })();
+  </script>
+  </body>
 </html>

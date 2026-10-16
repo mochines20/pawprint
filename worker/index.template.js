@@ -378,6 +378,46 @@ function localDay(timeZone, value = new Date()) {
   }
 }
 
+function streakDecision(timeZone, streak, activeDays) {
+  const today = localDay(timeZone);
+  const todayDate = new Date(`${today}T00:00:00Z`);
+  const lastDay = String(streak?.last_local_day || "");
+  const freezeCount = Number(streak?.freeze_count ?? 0);
+  let dayGap = null;
+  if (lastDay) {
+    const lastDate = new Date(`${lastDay}T00:00:00Z`);
+    if (Number.isFinite(lastDate.getTime())) dayGap = Math.round((todayDate - lastDate) / 86400000);
+  }
+  const protectedGap = dayGap === 1 || (dayGap === 2 && freezeCount > 0);
+  const active = Boolean(lastDay && (lastDay === today || protectedGap));
+  const days = [];
+  for (let offset = -3; offset <= 3; offset += 1) {
+    const date = new Date(todayDate);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const key = date.toISOString().slice(0, 10);
+    let status = activeDays.has(key) ? "complete" : "empty";
+    if (key === today) status = activeDays.has(key) ? "complete" : "today";
+    if (!activeDays.has(key) && dayGap === 2 && freezeCount > 0 && key === lastDay) status = "freeze";
+    days.push({
+      key,
+      label: new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(date),
+      number: date.getUTCDate(),
+      status,
+      isToday: key === today,
+    });
+  }
+  return {
+    today,
+    active,
+    broken: !active,
+    state: active ? "active" : "broken",
+    dayGap,
+    label: active ? "Orange cat streak" : "Black cat reset",
+    helper: active ? "Validated pawprints keep it glowing." : "Validate a cat photo to restart your streak.",
+    days,
+  };
+}
+
 async function updateStreak(env, userId, timeZone, sightingId) {
   const day = localDay(timeZone);
   const previous = await env.DB.prepare("SELECT current_count,best_count,last_local_day,freeze_count FROM streaks WHERE user_id=?").bind(userId).first();
@@ -442,13 +482,25 @@ async function getJournal(request, env) {
 
 async function getDashboard(request, env) {
   const user = await requireUser(request, env);
-  const [sightings, journal, streak, rewards] = await Promise.all([
+  const [sightings, journal, streak, rewards, profile, recentAccepted] = await Promise.all([
     getSightings(request, env),
     env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN first_spotted=1 THEN 1 ELSE 0 END) AS unique_count FROM journal_entries WHERE user_id=?").bind(user.id).first(),
-    env.DB.prepare("SELECT current_count,best_count,freeze_count FROM streaks WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT current_count,best_count,last_local_day,freeze_count FROM streaks WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM reward_ledger WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT time_zone FROM users WHERE id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT captured_at FROM sightings WHERE user_id=? AND validation_status='accepted' AND captured_at>=? ORDER BY captured_at DESC LIMIT 400").bind(user.id, new Date(Date.now() - 14 * 86400000).toISOString()).all(),
   ]);
-  return json({ sightings, journal: { total: Number(journal?.total || 0), unique: Number(journal?.unique_count || 0) }, streak: { current: Number(streak?.current_count || 0), best: Number(streak?.best_count || 0), freezes: Number(streak?.freeze_count || 1) }, xp: Number(rewards?.total || 0) });
+  const timeZone = String(profile?.time_zone || "Asia/Manila");
+  const activeDays = new Set((recentAccepted.results || []).map((row) => localDay(timeZone, new Date(row.captured_at))));
+  const decision = streakDecision(timeZone, streak, activeDays);
+  return json({
+    sightings,
+    journal: { total: Number(journal?.total || 0), unique: Number(journal?.unique_count || 0) },
+    streak: { current: Number(streak?.current_count || 0), best: Number(streak?.best_count || 0), freezes: Number(streak?.freeze_count || 1), lastDay: streak?.last_local_day || null, timeZone, ...decision },
+    streakCalendar: decision.days,
+    today: { key: decision.today, validated: activeDays.has(decision.today) },
+    xp: Number(rewards?.total || 0),
+  });
 }
 
 async function getCareFlags(request, env) {
