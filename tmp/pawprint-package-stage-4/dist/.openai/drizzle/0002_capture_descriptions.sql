@@ -1,0 +1,3 @@
+-- The Worker creates this column defensively for both fresh and existing D1
+-- databases. Keep this migration as a no-op so a partially initialized
+-- database cannot fail deployment with "duplicate column name: description".

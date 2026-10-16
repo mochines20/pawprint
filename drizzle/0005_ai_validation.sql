@@ -1,9 +1,4 @@
 -- Store the server-side image validation decision and classification evidence.
--- A non-accepted result never earns rewards or becomes a public map record.
-ALTER TABLE sightings ADD COLUMN cat_breed TEXT;
-ALTER TABLE sightings ADD COLUMN coat_type TEXT;
-ALTER TABLE sightings ADD COLUMN cat_confidence REAL;
-ALTER TABLE sightings ADD COLUMN ai_confidence REAL;
-ALTER TABLE sightings ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE sightings ADD COLUMN ai_generated_confidence REAL;
-ALTER TABLE sightings ADD COLUMN validation_json TEXT;
+-- The Worker creates these columns defensively for both fresh and existing D1
+-- databases. Keep this migration as a no-op so deployments remain safe when
+-- the Worker has already initialized a partially migrated database.
