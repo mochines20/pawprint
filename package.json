@@ -1,0 +1,5 @@
+{
+  "name": "pawprint-worker",
+  "private": true,
+  "type": "module"
+}
