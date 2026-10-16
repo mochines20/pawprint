@@ -1,14 +1,51 @@
 const nativeFetch = window.fetch.bind(window);
-const authReady = Promise.resolve().then(async () => {
-  const response = await nativeFetch("/api/auth/config", { headers: { accept: "application/json" } });
-  if (!response.ok) throw new Error("AUTH_CONFIG_UNAVAILABLE");
-  const config = await response.json();
-  if (!config.enabled || !config.url || !config.anonKey) return { client: null, config };
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.57.4");
-  return { client: createClient(config.url, config.anonKey, { auth: { flowType: "pkce", detectSessionInUrl: false } }), config };
-});
+let authConfigPromise = null;
+let authClientPromise = null;
+let authStateSubscription = null;
+let authSessionChecked = false;
+let authenticatedFetchInstalled = false;
 
-window.pawprintAuthReady = authReady;
+function loadAuthConfig() {
+  if (!authConfigPromise) {
+    authConfigPromise = withTimeout(nativeFetch("/api/auth/config", { headers: { accept: "application/json" } }), 4000, "AUTH_CONFIG_TIMEOUT")
+      .then((response) => {
+        if (!response.ok) throw new Error("AUTH_CONFIG_UNAVAILABLE");
+        return response.json();
+      })
+      .then((config) => {
+        authConfig = config;
+        window.pawprintAuthConfig = config;
+        return config;
+      })
+      .catch((error) => {
+        authConfigPromise = null;
+        throw error;
+      });
+  }
+  return authConfigPromise;
+}
+
+async function ensureAuthClient() {
+  const config = authConfig || await loadAuthConfig();
+  if (!config?.enabled || !config.url || !config.anonKey) return null;
+  if (client) return client;
+  if (!authClientPromise) {
+    authClientPromise = withTimeout(import("https://esm.sh/@supabase/supabase-js@2.57.4"), 8000, "AUTH_CLIENT_TIMEOUT")
+      .then(({ createClient }) => {
+        client = createClient(config.url, config.anonKey, { auth: { flowType: "pkce", detectSessionInUrl: false } });
+        window.pawprintSupabase = client;
+        installAuthenticatedFetch();
+        return client;
+      })
+      .catch((error) => {
+        authClientPromise = null;
+        throw error;
+      });
+  }
+  return authClientPromise;
+}
+
+window.pawprintAuthReady = ensureAuthClient;
 window.pawprintSession = null;
 
 const styles = `
@@ -180,23 +217,86 @@ function onboardingMarkup() {
     </form><p class="auth-status" id="pawprintAuthStatus" role="status" aria-live="polite"></p>`;
 }
 
-function openAuth(mode = "auth", accountMode = "login") {
+async function openAuth(mode = "auth", accountMode = "login") {
   if (window.pawprintDemoMode) return;
   if (!modal) return;
-  modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup(accountMode)}</div>`;
+  const requestId = Number(modal.dataset.openRequest || 0) + 1;
+  modal.dataset.openRequest = String(requestId);
+  const currentRequest = () => modal.dataset.openRequest === String(requestId) && modal.getAttribute("aria-hidden") === "false";
+  modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle"><button class="auth-close" type="button" data-close-auth aria-label="Close sign in">×</button><p class="auth-kicker">Private by default</p><h2 id="pawprintAuthTitle">Preparing secure sign-in…</h2><p role="status" aria-live="polite">Connecting to Pawprint Auth. This only happens when you open sign-in.</p></div>`;
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
   modal.dataset.mode = mode;
   modal.dataset.accountMode = accountMode;
-  statusNode = modal.querySelector("#pawprintAuthStatus");
-  if (mode === "onboarding") modal.querySelector("#pawprintNickname")?.focus();
-  else modal.querySelector("#pawprintAuthEmail")?.focus();
+  try {
+    await ensureAuthClient();
+    if (!currentRequest()) return;
+    if (client) await syncAuthSession();
+    if (!currentRequest()) return;
+    if (window.pawprintSession && mode !== "onboarding") {
+      closeAuth();
+      const ready = await finishOnboarding();
+      if (ready) continuePendingApp();
+      return;
+    }
+    modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup(accountMode)}</div>`;
+    statusNode = modal.querySelector("#pawprintAuthStatus");
+    if (!client && authConfig?.enabled) setStatus("Secure sign-in could not connect. Check your connection and try again.", "error");
+    if (!authConfig?.enabled) setStatus("Supabase Auth is not configured for this preview yet.", "error");
+    if (mode === "onboarding") modal.querySelector("#pawprintNickname")?.focus();
+    else modal.querySelector("#pawprintAuthEmail")?.focus();
+  } catch (error) {
+    if (!currentRequest()) return;
+    modal.innerHTML = `<div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="pawprintAuthTitle">${mode === "onboarding" ? onboardingMarkup() : authMarkup(accountMode)}</div>`;
+    statusNode = modal.querySelector("#pawprintAuthStatus");
+    setStatus(error?.message === "AUTH_CONFIG_TIMEOUT" ? "Pawprint Auth did not respond. Check that localhost is running, then close and retry." : "Secure sign-in is taking longer than expected. Please close this dialog and retry.", "error");
+    if (mode === "onboarding") modal.querySelector("#pawprintNickname")?.focus();
+    else modal.querySelector("#pawprintAuthEmail")?.focus();
+  }
 }
 
 function closeAuth() {
   if (!modal) return;
+  modal.dataset.openRequest = String(Number(modal.dataset.openRequest || 0) + 1);
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
+}
+
+function installAuthenticatedFetch() {
+  if (authenticatedFetchInstalled) return;
+  authenticatedFetchInstalled = true;
+  const originalFetch = window.fetch;
+  window.fetch = (input, init = {}) => {
+    const requestUrl = typeof input === "string" ? input : input?.url || "";
+    const sameOriginApi = requestUrl.startsWith("/api/") || requestUrl.startsWith(location.origin + "/api/");
+    if (!sameOriginApi || !window.pawprintSession?.access_token) return originalFetch(input, init);
+    const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+    headers.set("Authorization", `Bearer ${window.pawprintSession.access_token}`);
+    return originalFetch(input, { ...init, headers });
+  };
+}
+
+function watchAuthState() {
+  if (!client || authStateSubscription) return;
+  authStateSubscription = client.auth.onAuthStateChange((event, session) => {
+    window.pawprintSession = session;
+    authSessionChecked = true;
+    updateTriggers();
+    if (event === "PASSWORD_RECOVERY") openAuth("auth", "reset-confirm");
+    else if (session) finishOnboarding().then((ready) => { if (ready) continuePendingApp(); });
+  }).data.subscription;
+}
+
+async function syncAuthSession() {
+  if (!client) return null;
+  if (!authSessionChecked) {
+    const sessionResult = await withTimeout(client.auth.getSession(), 8000, "AUTH_SESSION_TIMEOUT");
+    window.pawprintSession = sessionResult.data.session;
+    authSessionChecked = true;
+  }
+  updateTriggers();
+  watchAuthState();
+  return window.pawprintSession;
 }
 
 function addTriggers() {
@@ -460,46 +560,31 @@ async function init() {
   bindModal();
   bindDocumentTriggers();
   addTriggers();
-  const result = await authReady.catch(() => ({ client: null, config: { enabled: false } }));
-  client = result.client;
-  authConfig = result.config;
-  window.pawprintSupabase = client;
-  window.pawprintAuthConfig = authConfig;
-  const originalFetch = window.fetch;
-  window.fetch = (input, init = {}) => {
-    const requestUrl = typeof input === "string" ? input : input?.url || "";
-    const sameOriginApi = requestUrl.startsWith("/api/") || requestUrl.startsWith(location.origin + "/api/");
-    if (!sameOriginApi || !window.pawprintSession?.access_token) return originalFetch(input, init);
-    const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
-    headers.set("Authorization", `Bearer ${window.pawprintSession.access_token}`);
-    return originalFetch(input, { ...init, headers });
-  };
-  if (!client) {
-    updateTriggers();
-    protectAppRoute();
-    releaseAuthGate();
-    return;
-  }
+  installAuthenticatedFetch();
   const callbackParams = new URLSearchParams(location.search);
   const callbackCode = callbackParams.get("code");
   const recoveryCallback = callbackParams.get("next") === "reset";
-  if (location.pathname === "/auth/callback" && callbackCode) {
-    const exchange = await client.auth.exchangeCodeForSession(callbackCode);
-    if (exchange.error) openAuth("auth", "login");
-    history.replaceState({}, "", "/#app");
+  const isDemoRoute = new URLSearchParams(location.search).get("demo") === "1";
+  const needsAuth = !isDemoRoute && (location.hash === "#app" || location.pathname === "/auth/callback" || recoveryCallback);
+  if (!needsAuth) {
+    updateTriggers();
+    releaseAuthGate();
+    return;
   }
-  const sessionResult = await client.auth.getSession();
-  window.pawprintSession = sessionResult.data.session;
-  updateTriggers();
+  try {
+    await ensureAuthClient();
+    if (client && location.pathname === "/auth/callback" && callbackCode) {
+      const exchange = await client.auth.exchangeCodeForSession(callbackCode);
+      if (exchange.error) openAuth("auth", "login");
+      history.replaceState({}, "", "/#app");
+    }
+    if (client) await syncAuthSession();
+  } catch {
+    // The public landing page stays usable even if the auth CDN or service is unavailable.
+  }
   if (recoveryCallback) openAuth("auth", "reset-confirm");
   else if (window.pawprintSession) finishOnboarding().then((ready) => { if (ready) continuePendingApp(); });
   else protectAppRoute();
-  client.auth.onAuthStateChange((_event, session) => {
-    window.pawprintSession = session;
-    updateTriggers();
-    if (_event === "PASSWORD_RECOVERY") openAuth("auth", "reset-confirm");
-    else if (session) finishOnboarding().then((ready) => { if (ready) continuePendingApp(); });
-  });
   releaseAuthGate();
 }
 

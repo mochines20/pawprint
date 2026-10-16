@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/embed-html.mjs"
+    "build": "node scripts/embed-html.mjs",
+    "qa:edge": "node scripts/qa-edge-cases.mjs"
   }
 }

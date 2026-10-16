@@ -18,6 +18,9 @@ const output = template
   .replace("__PAWPRINT_CAT_PAW_SVG__", JSON.stringify(catPaw))
   .replace("__PAWPRINT_CAT_JS__", JSON.stringify(pawprintCat))
   .replace("__PAWPRINT_SUPABASE_AUTH_JS__", JSON.stringify(supabaseAuth));
+const serviceWorker = template.match(/^const PWA_SERVICE_WORKER = `([\s\S]*?)`;/m)?.[1];
+if (!serviceWorker) throw new Error("Could not extract the Pawprint service worker from its template");
 fs.mkdirSync(path.join(root, "dist", "server"), { recursive: true });
 fs.writeFileSync(path.join(root, "dist", "server", "index.js"), output);
+fs.writeFileSync(path.join(root, "dist", "sw.js"), `${serviceWorker}\n`);
 console.log("Generated dist/server/index.js");

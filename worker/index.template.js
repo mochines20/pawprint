@@ -6,7 +6,7 @@ const CAT_PAW_SVG = __PAWPRINT_CAT_PAW_SVG__;
 const PAWPRINT_CAT_JS = __PAWPRINT_CAT_JS__;
 const SUPABASE_AUTH_JS = __PAWPRINT_SUPABASE_AUTH_JS__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Gotta spot ’em all—safely.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
-const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v3'; self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))); self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return; event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(new URL(event.request.url).origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
+const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v6'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -185,6 +185,65 @@ function parseModelJson(text) {
   try { return JSON.parse(cleaned); } catch { return JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || "{}"); }
 }
 
+const AI_VALIDATION_PROMPT = "Inspect this camera capture for Pawprint and return JSON only. Confirm that a clearly visible real cat is present, while rejecting obvious screenshots, photos of screens, collages, or images with no cat. Use high precision for safety flags: do not mark aiGenerated or unsafe because of a cat's body shape, breed appearance, fur pattern, lighting, background blur, compression, low resolution, or unusual pose. A real cat photo can look stylized. Set aiGenerated=true only when there are multiple unmistakable synthetic artifacts such as impossible anatomy, warped/repeated features, broken text, inconsistent shadows, or obvious digital compositing, and only when confidence is at least 0.85; otherwise keep aiGenerated=false and aiGeneratedConfidence at or below 0.30. Set unsafe=true only for graphic injury, cruelty, severe distress, sexual/nudity content, or dangerous human content; unusual weight or appearance is not unsafe. If uncertain, keep these flags false and explain the uncertainty instead of guessing. Use booleans for catDetected, personDetected, screenshotDetected, unsafe, duplicate, and aiGenerated. Include numeric confidence values from 0 to 1 for catConfidence, breedConfidence, and aiGeneratedConfidence. Do not guess a breed when visual evidence is weak. Suggest one breed only when supported (for example domestic shorthair, Siamese, Persian, Maine Coon, Bengal, Ragdoll, Sphynx, Scottish Fold, British Shorthair, or mixed breed), plus one coat/pattern label from: orange tabby, tuxedo, black, white, calico, tortoiseshell, gray tabby, ginger-white, mixed, unclassified. Explain the decision briefly in reason.";
+
+function providerHeaders(env, contentType = "application/json") {
+  const headers = { "content-type": contentType };
+  if (env.OLLAMA_API_TOKEN) headers.authorization = `Bearer ${env.OLLAMA_API_TOKEN}`;
+  else if (env.OLLAMA_USERNAME && env.OLLAMA_PASSWORD) headers.authorization = `Basic ${btoa(`${env.OLLAMA_USERNAME}:${env.OLLAMA_PASSWORD}`)}`;
+  return headers;
+}
+
+function ollamaEndpoint(base, path) {
+  const normalizedBase = String(base || "").replace(/\/+$/, "");
+  const normalizedPath = String(path || "").startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function validateWithOllama(env, bytes, contentType) {
+  const base = env.OLLAMA_BASE_URL || env.OLLAMA_API_URL;
+  if (!base) throw new Error("OLLAMA_URL_MISSING");
+  const mode = String(env.OLLAMA_API_MODE || "native").toLowerCase();
+  const configuredPath = env.OLLAMA_API_PATH;
+  const paths = configuredPath ? [configuredPath] : mode === "openai" ? ["/v1/chat/completions"] : ["/api/chat"];
+  const model = env.OLLAMA_MODEL || "qwen2.5vl:7b";
+  const encoded = bytesToBase64(bytes);
+  let lastError = null;
+  for (const path of paths) {
+    const isOpenAI = mode === "openai" || /\/v1\/chat\/completions$/.test(path);
+    const body = isOpenAI ? {
+      model,
+      stream: false,
+      temperature: 0,
+      messages: [
+        { role: "system", content: AI_VALIDATION_PROMPT },
+        { role: "user", content: [
+          { type: "text", text: "Analyze this image and return the requested JSON only." },
+          { type: "image_url", image_url: { url: `data:${contentType || "image/jpeg"};base64,${encoded}` } },
+        ] },
+      ],
+    } : {
+      model,
+      stream: false,
+      options: { temperature: 0 },
+      messages: [
+        { role: "system", content: AI_VALIDATION_PROMPT },
+        { role: "user", content: "Analyze this image and return the requested JSON only.", images: [encoded] },
+      ],
+    };
+    try {
+      const response = await fetch(ollamaEndpoint(base, path), { method: "POST", headers: providerHeaders(env), body: JSON.stringify(body) });
+      if (!response.ok) { lastError = new Error(`OLLAMA_${response.status}`); continue; }
+      const payload = await response.json();
+      const text = isOpenAI ? payload.choices?.[0]?.message?.content || "" : payload.message?.content || payload.response || "";
+      return normalizeValidation(parseModelJson(text), env);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("OLLAMA_PROVIDER_UNAVAILABLE");
+}
+
 async function validateWithGemini(env, bytes, contentType) {
   const model = env.GEMINI_MODEL || "gemini-2.5-flash";
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -192,7 +251,7 @@ async function validateWithGemini(env, bytes, contentType) {
     headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [
-        { text: "Inspect this camera capture for Pawprint. Return JSON only. This image came from a live camera capture, so reject obvious screenshots, photos of screens, collages, synthetic or AI-generated images, heavy digital edits, recognizable people or faces, unsafe or graphic content, and images without a clearly visible real cat. Do not guess a breed when the visual evidence is weak. Use booleans for catDetected, personDetected, screenshotDetected, unsafe, duplicate, and aiGenerated. Include numeric confidence values from 0 to 1 for catConfidence, breedConfidence, and aiGeneratedConfidence. Suggest one breed only when supported (for example domestic shorthair, Siamese, Persian, Maine Coon, Bengal, Ragdoll, Sphynx, Scottish Fold, British Shorthair, or mixed breed), plus one coat/pattern label from: orange tabby, tuxedo, black, white, calico, tortoiseshell, gray tabby, ginger-white, mixed, unclassified. Explain the decision briefly in reason." },
+        { text: AI_VALIDATION_PROMPT },
         { inlineData: { mimeType: contentType || "image/jpeg", data: bytesToBase64(bytes) } },
       ] }],
       generationConfig: {
@@ -232,7 +291,7 @@ function normalizeValidation(result = {}, env = {}) {
   const breedConfidence = boundedConfidence(result.breedConfidence, 0);
   const aiGeneratedConfidence = boundedConfidence(result.aiGeneratedConfidence, aiGenerated ? 1 : 0);
   const catThreshold = boundedConfidence(env.AI_CAT_CONFIDENCE_THRESHOLD, 0.78);
-  const aiThreshold = boundedConfidence(env.AI_GENERATED_CONFIDENCE_THRESHOLD, 0.8);
+  const aiThreshold = boundedConfidence(env.AI_GENERATED_CONFIDENCE_THRESHOLD, 0.85);
   let status = "accepted";
   let reason = "AI_VALIDATED";
   if (unsafe) { status = "rejected"; reason = "UNSAFE_IMAGE"; }
@@ -240,7 +299,7 @@ function normalizeValidation(result = {}, env = {}) {
   else if (screenshotDetected) { status = "rejected"; reason = "SCREENSHOT_DETECTED"; }
   else if (duplicate) { status = "rejected"; reason = "DUPLICATE_IMAGE"; }
   else if (!catDetected || catConfidence < catThreshold) { status = "rejected"; reason = "IMAGE_NOT_A_CAT"; }
-  else if (aiGenerated || aiGeneratedConfidence >= aiThreshold) { status = "rejected"; reason = "AI_GENERATED_IMAGE"; }
+  else if ((aiGenerated && aiGeneratedConfidence >= aiThreshold) || aiGeneratedConfidence >= aiThreshold) { status = "rejected"; reason = "AI_GENERATED_IMAGE"; }
   else if (catConfidence < Math.min(0.9, catThreshold + 0.1) || aiGeneratedConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
   const breed = typeof result.suggestedBreed === "string" && result.suggestedBreed.trim() ? result.suggestedBreed.trim().slice(0, 80) : null;
   const coat = typeof result.suggestedCoatType === "string" && result.suggestedCoatType.trim() ? result.suggestedCoatType.trim().slice(0, 80) : null;
@@ -265,6 +324,10 @@ function normalizeValidation(result = {}, env = {}) {
 }
 
 async function validatePhoto(env, bytes, contentType) {
+  if (env.OLLAMA_BASE_URL || env.OLLAMA_API_URL || String(env.AI_PROVIDER || "").toLowerCase() === "ollama") {
+    try { return await validateWithOllama(env, bytes, contentType); }
+    catch { return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null }; }
+  }
   if (env.GEMINI_API_KEY) {
     try { return await validateWithGemini(env, bytes, contentType); }
     catch { return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null }; }
@@ -972,7 +1035,7 @@ async function api(request, env, url) {
     service: "pawprint",
     time: now(),
     authConfigured: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY),
-    aiValidationConfigured: Boolean(env.GEMINI_API_KEY || env.AI_VALIDATION_URL),
+    aiValidationConfigured: Boolean(env.GEMINI_API_KEY || env.OLLAMA_BASE_URL || env.OLLAMA_API_URL || env.AI_VALIDATION_URL),
     storageConfigured: Boolean(env.DB && env.BUCKET),
   });
   if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "", providers: { google: env.SUPABASE_GOOGLE_AUTH_ENABLED === "true", apple: env.SUPABASE_APPLE_AUTH_ENABLED === "true" } });

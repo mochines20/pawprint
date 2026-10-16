@@ -141,7 +141,31 @@ async function readJson(request) {
   try { return JSON.parse(body || "{}"); } catch { return {}; }
 }
 
+async function readBody(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+async function proxyRemoteApi(request, url, response, origin) {
+  const target = `${origin}${url.pathname}${url.search}`;
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (key === "host" || key === "content-length") continue;
+    headers.set(key, value);
+  }
+  const body = request.method === "GET" || request.method === "HEAD" ? undefined : await readBody(request);
+  const upstream = await fetch(target, { method: request.method, headers, body });
+  const responseHeaders = {};
+  upstream.headers.forEach((value, key) => {
+    if (key !== "content-encoding" && key !== "transfer-encoding") responseHeaders[key] = value;
+  });
+  response.writeHead(upstream.status, responseHeaders);
+  response.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
 await loadLocalEnv();
+const remoteApiOrigin = String(process.env.PAWPRINT_API_ORIGIN || "").replace(/\/$/, "");
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
@@ -166,9 +190,18 @@ const server = createServer(async (request, response) => {
       ok: true,
       service: "pawprint-local-preview",
       supabaseConfigured: Boolean(process.env.PAWPRINT_SUPABASE_URL && (process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
-      aiValidationConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.AI_VALIDATION_URL),
-      persistence: "preview-only",
+      aiValidationConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.OLLAMA_BASE_URL || process.env.OLLAMA_API_URL || process.env.AI_VALIDATION_URL),
+      persistence: remoteApiOrigin ? "remote-worker" : "preview-only",
+      backendOrigin: remoteApiOrigin || null,
     }));
+    return;
+  }
+  if (remoteApiOrigin && url.pathname.startsWith("/api/") && url.pathname !== "/api/auth/config" && url.pathname !== "/api/health") {
+    try {
+      await proxyRemoteApi(request, url, response, remoteApiOrigin);
+    } catch (error) {
+      sendJson(response, { error: "REMOTE_API_UNAVAILABLE", detail: String(error?.message || error) }, 502);
+    }
     return;
   }
   if (url.pathname === "/api/journal" && request.method === "GET") {
