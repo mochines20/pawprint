@@ -6,9 +6,17 @@ create table if not exists public.profiles (
   nickname text not null check (char_length(nickname) between 1 and 40),
   avatar text,
   age_group text not null check (age_group in ('13_17', '18_24', '25_34', '35_44', '45_plus', 'prefer_not_to_say')),
+  privacy_notice_version text not null default '2026-10-15',
+  privacy_consent_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Safe migration for profiles created by an earlier version of Pawprint.
+alter table public.profiles
+  add column if not exists privacy_notice_version text not null default '2026-10-15';
+alter table public.profiles
+  add column if not exists privacy_consent_at timestamptz;
 
 alter table public.profiles enable row level security;
 

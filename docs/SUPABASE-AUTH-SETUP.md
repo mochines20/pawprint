@@ -20,9 +20,13 @@ In Supabase Authentication settings, enable Email provider for password sign-up/
 
 For Google and Apple, register Supabase's provider callback URL in the provider console, then paste the provider credentials into Supabase. The app redirects users back to `/auth/callback`, exchanges the PKCE code, and sends first-time users to onboarding.
 
-## Profile privacy
+## Profile privacy and privacy notice
 
-Run [`supabase-auth.sql`](./supabase-auth.sql) in the Supabase SQL Editor. The table stores only the user's chosen nickname, avatar URL, and age group. It does not copy the provider's real name, provider avatar, or email. Row Level Security allows public profile reads and limits writes to the matching `auth.uid()`.
+Run [`supabase-auth.sql`](./supabase-auth.sql) in the Supabase SQL Editor. The table stores only the user's chosen nickname, sketch avatar identifier, age group, and the version/time of the privacy notice they accepted. It does not copy the provider's real name, provider avatar, or email. Row Level Security allows public profile reads and limits writes to the matching `auth.uid()`.
+
+The onboarding notice is written for the Philippine Data Privacy Act of 2012 (Republic Act No. 10173): it explains the purpose of processing, the data collected, the user's access/correction/export/deletion and objection or withdrawal options where applicable, and how to raise a privacy concern. Pawprint requests location only during an explicit cat-capture flow after device permission; it does not silently track or alter device location. Public pins are approximate, delayed by at least five minutes, and expire after 24 hours. Photos are re-encoded before storage or sharing so GPS EXIF metadata is removed.
+
+The notice is product wording, not a substitute for a completed legal review or a designated privacy contact. Before production launch, replace the generic contact language with the actual privacy officer/contact details and document the retention schedule and any processors used.
 
 ## Test checklist
 

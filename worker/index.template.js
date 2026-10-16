@@ -118,6 +118,12 @@ async function ensureRuntimeTables(env) {
   try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN city_name TEXT").run(); } catch { /* column already exists */ }
   try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN country_name TEXT NOT NULL DEFAULT 'Philippines'").run(); } catch { /* column already exists */ }
   try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_confidence REAL").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN cat_breed TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN coat_type TEXT").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN cat_confidence REAL").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN ai_generated_confidence REAL").run(); } catch { /* column already exists */ }
+  try { await env.DB.prepare("ALTER TABLE sightings ADD COLUMN validation_json TEXT").run(); } catch { /* column already exists */ }
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), type TEXT NOT NULL,
@@ -178,6 +184,38 @@ function rarityFor(catType, total = 0) {
   return "Common";
 }
 function levelFor(xp) { return Math.max(1, Math.floor(Math.sqrt(Math.max(0, Number(xp || 0)) / 100)) + 1); }
+const XP_MEDAL_CATALOG = [
+  { id: "xp-paw-seed", title: "Paw Seed", description: "Your first little mark on the Pawprint trail.", xpRequired: 0, tone: "mist" },
+  { id: "xp-first-paw", title: "First Paw", description: "A safe first step for the community.", xpRequired: 24, tone: "amber" },
+  { id: "xp-alley-scout", title: "Alley Scout", description: "You are learning the streets with care.", xpRequired: 100, tone: "sage" },
+  { id: "xp-night-watcher", title: "Night Watcher", description: "A steady eye for cats who need a little space.", xpRequired: 250, tone: "ink" },
+  { id: "xp-street-naturalist", title: "Street Naturalist", description: "A thoughtful record of neighborhood life.", xpRequired: 500, tone: "coral" },
+  { id: "xp-pawprint-legend", title: "Pawprint Legend", description: "A long, gentle trail of verified care.", xpRequired: 1000, tone: "gold" },
+];
+const EASTER_REWARD_CATALOG = [
+  { id: "easter-twenty-in-a-day", title: "Cat Marathon", description: "Photograph 20 accepted cat sightings in one local day.", requirement: "20 cats in one day", tone: "amber" },
+  { id: "easter-rare-find", title: "Rare Find", description: "Find an accepted rare or super-rare cat pattern.", requirement: "Rare cat found", tone: "coral" },
+  { id: "easter-gentle-helper", title: "Gentle Helper", description: "Send a care signal for a cat that needs help.", requirement: "Cat helped", tone: "sage" },
+];
+function medalsFor(totalXp, badgeRows = [], earnedIds = []) {
+  const earnedMap = new Map((badgeRows || []).map((row) => [row.badge_id, row.earned_at]));
+  for (const id of earnedIds || []) if (!earnedMap.has(id)) earnedMap.set(id, null);
+  return XP_MEDAL_CATALOG.map((medal) => {
+    const earned = Number(totalXp || 0) >= medal.xpRequired || earnedMap.has(medal.id);
+    return { ...medal, earned, earnedAt: earnedMap.get(medal.id) || null, remainingXp: Math.max(0, medal.xpRequired - Number(totalXp || 0)) };
+  });
+}
+function easterRewardsFor(criteria = {}, badgeRows = [], earnedIds = []) {
+  const earnedMap = new Map((badgeRows || []).map((row) => [row.badge_id, row.earned_at]));
+  for (const id of earnedIds || []) if (!earnedMap.has(id)) earnedMap.set(id, null);
+  return EASTER_REWARD_CATALOG.map((reward) => {
+    const triggered = reward.id === "easter-twenty-in-a-day" ? Boolean(criteria.twentyInDay)
+      : reward.id === "easter-rare-find" ? Boolean(criteria.rareFind)
+        : reward.id === "easter-gentle-helper" ? Boolean(criteria.careHelp) : false;
+    const earned = triggered || earnedMap.has(reward.id);
+    return { ...reward, earned, earnedAt: earnedMap.get(reward.id) || null };
+  });
+}
 async function isAdmin(request, env) {
   const user = await authenticatedUser(request, env);
   const configured = String(env.ADMIN_USER_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
@@ -249,38 +287,82 @@ async function validateWithGemini(env, bytes, contentType) {
     headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [
-        { text: "Inspect this camera capture for Pawprint. Return JSON only. Accept only if a real cat is clearly visible. Reject if there is no cat, a person or recognizable human face, a screenshot or screen/photo-of-a-screen, unsafe or graphic content, or an uncertain result. Suggest one coat/pattern label from: orange tabby, tuxedo, black, white, calico, tortoiseshell, gray tabby, ginger-white, mixed, unclassified. Use booleans for catDetected, personDetected, screenshotDetected, unsafe, duplicate; include reason and suggestedCoatType." },
+        { text: "Inspect this camera capture for Pawprint. Return JSON only. This image came from a live camera capture, so reject obvious screenshots, photos of screens, collages, synthetic or AI-generated images, heavy digital edits, recognizable people or faces, unsafe or graphic content, and images without a clearly visible real cat. Do not guess a breed when the visual evidence is weak. Use booleans for catDetected, personDetected, screenshotDetected, unsafe, duplicate, and aiGenerated. Include numeric confidence values from 0 to 1 for catConfidence, breedConfidence, and aiGeneratedConfidence. Suggest one breed only when supported (for example domestic shorthair, Siamese, Persian, Maine Coon, Bengal, Ragdoll, Sphynx, Scottish Fold, British Shorthair, or mixed breed), plus one coat/pattern label from: orange tabby, tuxedo, black, white, calico, tortoiseshell, gray tabby, ginger-white, mixed, unclassified. Explain the decision briefly in reason." },
         { inlineData: { mimeType: contentType || "image/jpeg", data: bytesToBase64(bytes) } },
       ] }],
       generationConfig: {
         temperature: 0,
-        responseMimeType: "application/json",
-        responseSchema: {
+        responseFormat: { text: { mimeType: "application/json", schema: {
           type: "OBJECT",
           properties: {
             catDetected: { type: "BOOLEAN" }, personDetected: { type: "BOOLEAN" }, screenshotDetected: { type: "BOOLEAN" },
-            unsafe: { type: "BOOLEAN" }, duplicate: { type: "BOOLEAN" }, reason: { type: "STRING" }, suggestedCoatType: { type: "STRING" },
+            unsafe: { type: "BOOLEAN" }, duplicate: { type: "BOOLEAN" }, aiGenerated: { type: "BOOLEAN" },
+            catConfidence: { type: "NUMBER" }, breedConfidence: { type: "NUMBER" }, aiGeneratedConfidence: { type: "NUMBER" },
+            reason: { type: "STRING" }, suggestedBreed: { type: "STRING" }, suggestedCoatType: { type: "STRING" },
           },
-          required: ["catDetected", "personDetected", "screenshotDetected", "unsafe", "duplicate", "reason", "suggestedCoatType"],
-        },
+          required: ["catDetected", "personDetected", "screenshotDetected", "unsafe", "duplicate", "aiGenerated", "catConfidence", "breedConfidence", "aiGeneratedConfidence", "reason", "suggestedBreed", "suggestedCoatType"],
+        } } },
       },
     }),
   });
   if (!response.ok) throw new Error(`GEMINI_${response.status}`);
   const payload = await response.json();
   const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "";
-  const result = parseModelJson(text);
+  return normalizeValidation(parseModelJson(text), env);
+}
+
+function boundedConfidence(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : fallback;
+}
+
+function normalizeValidation(result = {}, env = {}) {
+  const catDetected = result.catDetected === true;
+  const personDetected = result.personDetected === true;
+  const screenshotDetected = result.screenshotDetected === true;
+  const unsafe = result.unsafe === true;
+  const duplicate = result.duplicate === true;
+  const aiGenerated = result.aiGenerated === true;
+  const catConfidence = boundedConfidence(result.catConfidence ?? result.confidence, catDetected ? 0.8 : 0);
+  const breedConfidence = boundedConfidence(result.breedConfidence, 0);
+  const aiGeneratedConfidence = boundedConfidence(result.aiGeneratedConfidence, aiGenerated ? 1 : 0);
+  const catThreshold = boundedConfidence(env.AI_CAT_CONFIDENCE_THRESHOLD, 0.78);
+  const aiThreshold = boundedConfidence(env.AI_GENERATED_CONFIDENCE_THRESHOLD, 0.8);
+  let status = "accepted";
+  let reason = "AI_VALIDATED";
+  if (unsafe) { status = "rejected"; reason = "UNSAFE_IMAGE"; }
+  else if (personDetected) { status = "rejected"; reason = "PERSON_DETECTED"; }
+  else if (screenshotDetected) { status = "rejected"; reason = "SCREENSHOT_DETECTED"; }
+  else if (duplicate) { status = "rejected"; reason = "DUPLICATE_IMAGE"; }
+  else if (!catDetected || catConfidence < catThreshold) { status = "rejected"; reason = "IMAGE_NOT_A_CAT"; }
+  else if (aiGenerated || aiGeneratedConfidence >= aiThreshold) { status = "rejected"; reason = "AI_GENERATED_IMAGE"; }
+  else if (catConfidence < Math.min(0.9, catThreshold + 0.1) || aiGeneratedConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
+  const breed = typeof result.suggestedBreed === "string" && result.suggestedBreed.trim() ? result.suggestedBreed.trim().slice(0, 80) : null;
+  const coat = typeof result.suggestedCoatType === "string" && result.suggestedCoatType.trim() ? result.suggestedCoatType.trim().slice(0, 80) : null;
+  const catType = breed || coat || "Unclassified cat";
   return {
-    status: result.catDetected && !result.personDetected && !result.screenshotDetected && !result.duplicate && !result.unsafe ? "accepted" : "rejected",
-    reason: result.reason || "AI_VALIDATION_REJECTED",
-    catType: result.suggestedCoatType || "Unclassified cat",
+    status,
+    reason,
+    catDetected,
+    personDetected,
+    screenshotDetected,
+    unsafe,
+    duplicate,
+    catType,
+    catBreed: breed,
+    coatType: coat,
+    catConfidence,
+    breedConfidence,
+    aiGenerated,
+    aiGeneratedConfidence,
+    detail: typeof result.reason === "string" ? result.reason.slice(0, 500) : null,
   };
 }
 
 async function validatePhoto(env, bytes, contentType) {
   if (env.GEMINI_API_KEY) {
     try { return await validateWithGemini(env, bytes, contentType); }
-    catch { return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null }; }
+    catch { return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null }; }
   }
   if (env.AI_VALIDATION_URL) {
     try {
@@ -289,18 +371,14 @@ async function validatePhoto(env, bytes, contentType) {
         headers: { "content-type": contentType || "image/jpeg", "authorization": env.AI_VALIDATION_TOKEN ? `Bearer ${env.AI_VALIDATION_TOKEN}` : "" },
         body: bytes,
       });
-      if (!response.ok) return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE" };
+      if (!response.ok) return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null };
       const result = await response.json();
-      return {
-        status: result.catDetected && !result.personDetected && !result.screenshotDetected && !result.duplicate && !result.unsafe ? "accepted" : "rejected",
-        reason: result.reason || null,
-        catType: result.suggestedCoatType || null,
-      };
+      return normalizeValidation(result, env);
     } catch {
-      return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE" };
+      return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null };
     }
   }
-  return { status: "needs_review", reason: "AI_VALIDATION_NOT_CONFIGURED", catType: null };
+  return { status: "needs_review", reason: "AI_VALIDATION_NOT_CONFIGURED", catType: null, catBreed: null, coatType: null, catConfidence: null, aiGenerated: false, aiGeneratedConfidence: null, detail: null };
 }
 
 async function writeAudit(env, userId, action, entityType, entityId, metadata = {}) {
@@ -315,7 +393,7 @@ async function getSightings(request, env) {
   const current = now();
   const rows = user
     ? await env.DB.prepare(
-      `SELECT id, user_id, cat_type, description, public_geohash, captured_at, published_at, expires_at, visibility,
+      `SELECT id, user_id, cat_type, cat_breed, coat_type, cat_confidence, description, public_geohash, captured_at, published_at, expires_at, visibility,
               EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings
        WHERE validation_status='accepted' AND published_at <= ? AND expires_at > ?
@@ -324,7 +402,7 @@ async function getSightings(request, env) {
        ORDER BY captured_at DESC LIMIT 200`,
     ).bind(current, current, user.id, user.id).all()
     : await env.DB.prepare(
-      `SELECT id, user_id, cat_type, description, public_geohash, captured_at, published_at, expires_at, visibility,
+      `SELECT id, user_id, cat_type, cat_breed, coat_type, cat_confidence, description, public_geohash, captured_at, published_at, expires_at, visibility,
               EXISTS(SELECT 1 FROM care_flags WHERE care_flags.sighting_id=sightings.id AND care_flags.status='open') AS emergency
        FROM sightings WHERE validation_status='accepted' AND visibility='public' AND published_at <= ? AND expires_at > ?
        ORDER BY captured_at DESC LIMIT 200`,
@@ -332,6 +410,9 @@ async function getSightings(request, env) {
   return rows.results.map((row) => ({
     id: row.id,
     catType: row.cat_type,
+    catBreed: row.cat_breed || null,
+    coatType: row.coat_type || null,
+    catConfidence: row.cat_confidence == null ? null : Number(row.cat_confidence),
     rarity: rarityFor(row.cat_type),
     description: row.description || "",
     photoUrl: row.visibility === "public" ? `/api/sightings/${row.id}/photo` : null,
@@ -347,11 +428,14 @@ async function getSightings(request, env) {
 async function getSightingPhoto(request, env, sightingId) {
   await ensureRuntimeTables(env);
   const sighting = await env.DB.prepare(
-    `SELECT photo_key, visibility, validation_status, published_at, expires_at
+    `SELECT user_id, photo_key, visibility, validation_status, published_at, expires_at
      FROM sightings WHERE id=? LIMIT 1`,
   ).bind(sightingId).first();
   const current = now();
-  if (!sighting || sighting.visibility !== "public" || sighting.validation_status !== "accepted" || sighting.published_at > current || sighting.expires_at <= current) {
+  const user = await authenticatedUser(request, env);
+  const isOwner = Boolean(user && user.id === sighting?.user_id);
+  const isPublic = Boolean(sighting && sighting.visibility === "public" && sighting.published_at <= current && sighting.expires_at > current);
+  if (!sighting || sighting.validation_status !== "accepted" || (!isOwner && !isPublic)) {
     return new Response("Not found", { status: 404 });
   }
   if (!env.BUCKET || !sighting.photo_key) return new Response("Not found", { status: 404 });
@@ -359,7 +443,7 @@ async function getSightingPhoto(request, env, sightingId) {
   if (!object) return new Response("Not found", { status: 404 });
   const headers = new Headers();
   headers.set("content-type", object.httpMetadata?.contentType || "image/jpeg");
-  headers.set("cache-control", "public, max-age=300, must-revalidate");
+  headers.set("cache-control", isPublic ? "public, max-age=300, must-revalidate" : "private, no-store");
   return new Response(object.body, { headers });
 }
 
@@ -417,7 +501,9 @@ async function getJournal(request, env) {
   const rows = await env.DB.prepare(
     `SELECT journal_entries.id, journal_entries.sighting_id, journal_entries.cat_type,
             journal_entries.spotted_at, journal_entries.first_spotted, journal_entries.created_at,
-            sightings.visibility, sightings.validation_status, sightings.expires_at
+            sightings.visibility, sightings.validation_status, sightings.expires_at,
+            sightings.description, sightings.cat_breed, sightings.coat_type,
+            sightings.city_name, sightings.barangay_name, sightings.photo_key
      FROM journal_entries
      JOIN sightings ON sightings.id = journal_entries.sighting_id
      WHERE journal_entries.user_id=?
@@ -437,6 +523,13 @@ async function getJournal(request, env) {
       visibility: row.visibility,
       validationStatus: row.validation_status,
       expiresAt: row.expires_at,
+      description: row.description || "",
+      catBreed: row.cat_breed || "",
+      coatType: row.coat_type || "",
+      photoUrl: row.photo_key ? `/api/sightings/${encodeURIComponent(row.sighting_id)}/photo` : null,
+      locationLabel: row.visibility === "private"
+        ? "Private Journal area · exact location hidden"
+        : (row.barangay_name || row.city_name || "Approximate public area · exact location hidden"),
     })),
     summary: { total: Number(summary?.total || 0), unique: Number(summary?.unique_count || 0) },
   });
@@ -537,9 +630,15 @@ async function createSighting(request, env) {
   const expiresAt = new Date(uploadedAt.getTime() + 24 * 60 * 60 * 1000);
   const validation = await validatePhoto(env, bytes, photo.type);
   await env.DB.prepare(
-    `INSERT INTO sightings (id,user_id,photo_key,photo_hash,cat_type,description,validation_status,validation_reason,visibility,latitude,longitude,public_geohash,captured_at,uploaded_at,published_at,expires_at,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  ).bind(sightingId, user.id, photoKey, photoHash, validation.catType, description, validation.status, validation.reason, visibility, latitude, longitude, encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(), publishedAt.toISOString(), expiresAt.toISOString(), uploadedAt.toISOString()).run();
+    `INSERT INTO sightings (id,user_id,photo_key,photo_hash,cat_type,cat_breed,coat_type,cat_confidence,ai_confidence,ai_generated,ai_generated_confidence,validation_json,description,validation_status,validation_reason,visibility,latitude,longitude,public_geohash,captured_at,uploaded_at,published_at,expires_at,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    sightingId, user.id, photoKey, photoHash, validation.catType, validation.catBreed, validation.coatType,
+    validation.catConfidence ?? null, validation.catConfidence ?? null, validation.aiGenerated ? 1 : 0,
+    validation.aiGeneratedConfidence ?? null, JSON.stringify(validation), description, validation.status, validation.reason,
+    visibility, latitude, longitude, encodeGeohash(latitude, longitude, 6), capturedAt, uploadedAt.toISOString(),
+    publishedAt.toISOString(), expiresAt.toISOString(), uploadedAt.toISOString(),
+  ).run();
   let streak = null;
   if (validation.status === "accepted") {
     const previousCat = await env.DB.prepare("SELECT 1 FROM journal_entries WHERE user_id=? AND cat_type=? LIMIT 1").bind(user.id, validation.catType || "Unclassified cat").first();
@@ -555,7 +654,31 @@ async function createSighting(request, env) {
   }
   await env.DB.prepare("UPDATE capture_sessions SET used_at=? WHERE id=? AND user_id=?").bind(now(), captureSessionId, user.id).run();
   await writeAudit(env, user.id, "sighting.created", "sighting", sightingId, { validationStatus: validation.status, visibility });
-  const responseBody = { sightingId, status: validation.status, reason: validation.reason, catType: validation.catType, rarity: rarityFor(validation.catType), description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
+  const responseBody = {
+    sightingId,
+    status: validation.status,
+    reason: validation.reason,
+    validation: {
+      catDetected: Boolean(validation.catDetected),
+      personDetected: Boolean(validation.personDetected),
+      screenshotDetected: Boolean(validation.screenshotDetected),
+      unsafe: Boolean(validation.unsafe),
+      duplicate: Boolean(validation.duplicate),
+      catType: validation.catType,
+      catBreed: validation.catBreed,
+      coatType: validation.coatType,
+      catConfidence: validation.catConfidence,
+      aiGenerated: validation.aiGenerated,
+      aiGeneratedConfidence: validation.aiGeneratedConfidence,
+      detail: validation.detail,
+    },
+    catType: validation.catType,
+    rarity: rarityFor(validation.catType),
+    description,
+    publishedAt: publishedAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    rewards: validation.status === "accepted" ? { xp: 24, streak } : null,
+  };
   await env.DB.prepare("INSERT INTO request_keys (user_id,request_key,response_json,created_at) VALUES (?,?,?,?)").bind(user.id, idempotencyKey, JSON.stringify(responseBody), now()).run();
   return json(responseBody, 201);
 }
@@ -621,7 +744,7 @@ async function exportUser(request, env) {
   const [profile, settings, sightings, journal, streaks, rewards, careFlags, reports] = await Promise.all([
     env.DB.prepare("SELECT id,email,display_name,time_zone,language,created_at FROM users WHERE id=?").bind(user.id).first(),
     env.DB.prepare("SELECT default_visibility,show_age_group,allow_friend_requests,notification_preference,updated_at FROM user_settings WHERE user_id=?").bind(user.id).first(),
-    env.DB.prepare("SELECT id,cat_type,validation_status,visibility,captured_at,uploaded_at,expires_at FROM sightings WHERE user_id=? ORDER BY captured_at DESC").bind(user.id).all(),
+    env.DB.prepare("SELECT id,cat_type,cat_breed,coat_type,cat_confidence,ai_generated,ai_generated_confidence,validation_reason,validation_status,visibility,captured_at,uploaded_at,expires_at FROM sightings WHERE user_id=? ORDER BY captured_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT id,sighting_id,cat_type,spotted_at,first_spotted,created_at FROM journal_entries WHERE user_id=? ORDER BY spotted_at DESC").bind(user.id).all(),
     env.DB.prepare("SELECT current_count,best_count,last_local_day,freeze_count,updated_at FROM streaks WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT id,sighting_id,kind,amount,created_at FROM reward_ledger WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(),
@@ -659,26 +782,46 @@ async function awardBadges(env, userId, stats) {
   if (Number(stats.journalUnique || 0) >= 5) badges.push("alley-scout");
   if (Number(stats.bestStreak || 0) >= 7) badges.push("week-walker");
   if (Number(stats.careFlags || 0) >= 1) badges.push("gentle-helper");
+  for (const medal of XP_MEDAL_CATALOG) if (Number(stats.xp || 0) >= medal.xpRequired) badges.push(medal.id);
+  if (stats.twentyInDay) badges.push("easter-twenty-in-a-day");
+  if (stats.rareFind) badges.push("easter-rare-find");
+  if (stats.careHelp) badges.push("easter-gentle-helper");
   for (const badgeId of badges) await env.DB.prepare("INSERT OR IGNORE INTO user_badges (user_id,badge_id,earned_at) VALUES (?,?,?)").bind(userId, badgeId, now()).run();
   return badges;
 }
 
 async function getProgress(request, env) {
   const user = await requireUser(request, env);
-  const [xp, journal, streak, flags, badges, quests] = await Promise.all([
+  const [xp, journal, streak, flags, badges, quests, sightings, profile] = await Promise.all([
     env.DB.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM reward_ledger WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT COUNT(*) AS total, SUM(first_spotted) AS unique_count FROM journal_entries WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT current_count,best_count,freeze_count FROM streaks WHERE user_id=?").bind(user.id).first(),
-    env.DB.prepare("SELECT COUNT(*) AS total FROM care_flags WHERE user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM care_flags WHERE user_id=? AND status!='rejected'").bind(user.id).first(),
     env.DB.prepare("SELECT badge_id,earned_at FROM user_badges WHERE user_id=? ORDER BY earned_at DESC").bind(user.id).all(),
     env.DB.prepare(`SELECT quests.slug,quests.title,quests.description,quests.target,COALESCE(quest_progress.count,0) AS count,quest_progress.completed_at
       FROM quests LEFT JOIN quest_progress ON quest_progress.quest_id=quests.id AND quest_progress.user_id=?
       WHERE quests.ends_at>? ORDER BY quests.ends_at ASC`).bind(user.id, now()).all(),
+    env.DB.prepare("SELECT captured_at,cat_type FROM sightings WHERE user_id=? AND validation_status='accepted' ORDER BY captured_at DESC LIMIT 2000").bind(user.id).all(),
+    env.DB.prepare("SELECT time_zone FROM users WHERE id=?").bind(user.id).first(),
   ]);
   const totalXp = Number(xp?.total || 0);
-  const stats = { journalTotal: Number(journal?.total || 0), journalUnique: Number(journal?.unique_count || 0), bestStreak: Number(streak?.best_count || 0), careFlags: Number(flags?.total || 0) };
+  const stats = { xp: totalXp, journalTotal: Number(journal?.total || 0), journalUnique: Number(journal?.unique_count || 0), bestStreak: Number(streak?.best_count || 0), careFlags: Number(flags?.total || 0) };
+  const timeZone = String(profile?.time_zone || "Asia/Manila");
+  const dailyCounts = new Map();
+  for (const row of sightings.results || []) {
+    const day = localDay(timeZone, new Date(row.captured_at));
+    dailyCounts.set(day, Number(dailyCounts.get(day) || 0) + 1);
+  }
+  const maxDailyCats = Math.max(0, ...dailyCounts.values());
+  stats.twentyInDay = maxDailyCats >= 20;
+  stats.rareFind = (sightings.results || []).some((row) => ["Rare", "Super Rare"].includes(rarityFor(row.cat_type)));
+  stats.careHelp = Number(flags?.total || 0) >= 1;
   const earned = await awardBadges(env, user.id, stats);
-  return json({ xp: totalXp, level: levelFor(totalXp), nextLevelXp: Math.pow(levelFor(totalXp), 2) * 100, streak: { current: Number(streak?.current_count || 0), best: Number(streak?.best_count || 0), freezes: Number(streak?.freeze_count || 1) }, badges: [...new Set([...(badges.results || []).map((row) => row.badge_id), ...earned])], quests: quests.results.map((row) => ({ slug: row.slug, title: row.title, description: row.description, target: Number(row.target), count: Number(row.count), completed: Boolean(row.completed_at) })), rarity: { common: "Common", uncommon: "Uncommon", rare: "Rare", superRare: "Super Rare" } });
+  const badgeIds = [...new Set([...(badges.results || []).map((row) => row.badge_id), ...earned])];
+  const medals = medalsFor(totalXp, badges.results || [], earned);
+  const nextMedal = medals.find((medal) => !medal.earned) || null;
+  const easterRewards = easterRewardsFor(stats, badges.results || [], earned);
+  return json({ xp: totalXp, level: levelFor(totalXp), nextLevelXp: Math.pow(levelFor(totalXp), 2) * 100, streak: { current: Number(streak?.current_count || 0), best: Number(streak?.best_count || 0), freezes: Number(streak?.freeze_count || 1) }, badges: badgeIds, medals, nextMedal, easterRewards, quests: quests.results.map((row) => ({ slug: row.slug, title: row.title, description: row.description, target: Number(row.target), count: Number(row.count), completed: Boolean(row.completed_at) })), rarity: { common: "Common", uncommon: "Uncommon", rare: "Rare", superRare: "Super Rare" } });
 }
 
 async function getLeaderboards(request, env) {
@@ -761,13 +904,17 @@ async function createCommunityAsset(request, env) {
 
 async function getWrapped(request, env) {
   const user = await requireUser(request, env);
-  const [journal, xp, streak, care] = await Promise.all([
+  const [journal, xp, streak, care, badges] = await Promise.all([
     env.DB.prepare("SELECT COUNT(*) AS total,COUNT(DISTINCT cat_type) AS types FROM journal_entries WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT COALESCE(SUM(amount),0) AS total FROM reward_ledger WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT best_count FROM streaks WHERE user_id=?").bind(user.id).first(),
     env.DB.prepare("SELECT COUNT(*) AS total FROM care_flags WHERE user_id=? AND status!='rejected'").bind(user.id).first(),
+    env.DB.prepare("SELECT badge_id,earned_at FROM user_badges WHERE user_id=? ORDER BY earned_at ASC").bind(user.id).all(),
   ]);
-  return json({ year: new Date().getUTCFullYear(), stats: { catsSpotted: Number(journal?.total || 0), typesCollected: Number(journal?.types || 0), xp: Number(xp?.total || 0), bestStreak: Number(streak?.best_count || 0), careFlags: Number(care?.total || 0) }, shareText: `My Pawprint Wrapped: ${Number(journal?.total || 0)} cats spotted, ${Number(xp?.total || 0)} XP earned, and ${Number(care?.total || 0)} care signals shared.` });
+  const totalXp = Number(xp?.total || 0);
+  const earnedMedals = medalsFor(totalXp, badges.results || []).filter((medal) => medal.earned);
+  const currentMedal = earnedMedals[earnedMedals.length - 1] || XP_MEDAL_CATALOG[0];
+  return json({ year: new Date().getUTCFullYear(), stats: { catsSpotted: Number(journal?.total || 0), typesCollected: Number(journal?.types || 0), xp: totalXp, bestStreak: Number(streak?.best_count || 0), careFlags: Number(care?.total || 0), medal: { id: currentMedal.id, title: currentMedal.title, xpRequired: currentMedal.xpRequired } }, shareText: `My Pawprint Wrapped: ${Number(journal?.total || 0)} cats spotted, ${totalXp} XP earned, and ${currentMedal.title} medal unlocked.` });
 }
 
 async function getShareCard(request, env) {
@@ -840,7 +987,14 @@ async function expireSightings(request, env) {
 }
 
 async function api(request, env, url) {
-  if (url.pathname === "/api/health") return json({ ok: true, service: "pawprint", time: now() });
+  if (url.pathname === "/api/health") return json({
+    ok: true,
+    service: "pawprint",
+    time: now(),
+    authConfigured: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY),
+    aiValidationConfigured: Boolean(env.GEMINI_API_KEY || env.AI_VALIDATION_URL),
+    storageConfigured: Boolean(env.DB && env.BUCKET),
+  });
   if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "", providers: { google: env.SUPABASE_GOOGLE_AUTH_ENABLED === "true", apple: env.SUPABASE_APPLE_AUTH_ENABLED === "true" } });
   if (url.pathname === "/api/capture-sessions" && request.method === "POST") return startCaptureSession(request, env);
   if (url.pathname === "/api/dashboard" && request.method === "GET") return getDashboard(request, env);

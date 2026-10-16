@@ -24,6 +24,10 @@ type ValidationResult = {
   personDetected: boolean;
   screenshotDetected: boolean;
   duplicateOf?: UUID;
+  aiGenerated?: boolean;
+  aiGeneratedConfidence?: number;
+  catConfidence?: number;
+  suggestedBreed?: string;
   suggestedCoatType?: string;
   confidence?: number;
   reasons: string[];
@@ -34,6 +38,24 @@ type RewardResult = {
   badgesEarned: UUID[];
   journalEntryId: UUID;
   streaks: { spotting: number; explorer: number };
+};
+
+type XpMedal = {
+  id: string;
+  title: string;
+  description: string;
+  xpRequired: number;
+  earned: boolean;
+  earnedAt?: ISODateTime | null;
+  remainingXp: number;
+};
+
+type ProgressResult = {
+  xp: number;
+  level: number;
+  medals: XpMedal[];
+  nextMedal?: XpMedal | null;
+  easterRewards: Array<XpMedal & { requirement: string }>;
 };
 ```
 
@@ -122,6 +144,8 @@ Required checks:
 - Duplicate or near-duplicate image hash.
 - Unsafe or prohibited image moderation.
 - Coat colour/pattern suggestion and optional breed-type suggestion.
+- AI-generated or heavily edited image detection. A positive or high-confidence result is rejected; an uncertain result enters `needs_review`.
+- Store the model decision, confidence values, breed/coat suggestion, and stable reason code with the sighting for auditability.
 
 The result is advisory for type classification but authoritative for reward gating once the configured thresholds are met. Low-confidence or conflicting results must enter `needs_review`.
 
@@ -318,7 +342,7 @@ Deletion must cover account data, original photos, thumbnails, precise coordinat
 
 Use stable, translatable codes rather than exposing provider or database messages.
 
-`AUTH_REQUIRED`, `FORBIDDEN`, `SESSION_INVALID`, `SESSION_USED`, `LOCATION_REQUIRED`, `CAMERA_REQUIRED`, `INVALID_COORDINATE`, `PRIVATE_PROPERTY`, `IMAGE_NOT_A_CAT`, `PERSON_DETECTED`, `SCREENSHOT_DETECTED`, `DUPLICATE_IMAGE`, `UNSAFE_IMAGE`, `VALIDATION_PENDING`, `RATE_LIMITED`, `SIGHTING_EXPIRED`, `REPORT_NOT_ALLOWED`, `EXPORT_IN_PROGRESS`, and `DELETION_IN_PROGRESS`.
+`AUTH_REQUIRED`, `FORBIDDEN`, `SESSION_INVALID`, `SESSION_USED`, `LOCATION_REQUIRED`, `CAMERA_REQUIRED`, `INVALID_COORDINATE`, `PRIVATE_PROPERTY`, `IMAGE_NOT_A_CAT`, `PERSON_DETECTED`, `SCREENSHOT_DETECTED`, `AI_GENERATED_IMAGE`, `DUPLICATE_IMAGE`, `UNSAFE_IMAGE`, `VALIDATION_PENDING`, `AI_VALIDATION_NOT_CONFIGURED`, `AI_PROVIDER_UNAVAILABLE`, `RATE_LIMITED`, `SIGHTING_EXPIRED`, `REPORT_NOT_ALLOWED`, `EXPORT_IN_PROGRESS`, and `DELETION_IN_PROGRESS`.
 
 ## Minimum test matrix
 

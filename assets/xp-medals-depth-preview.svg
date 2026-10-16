@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 510" role="img" aria-labelledby="title desc">
+  <title id="title">Pawprint XP medals — sketch depth preview</title>
+  <desc id="desc">Six hand-drawn cat medals with layered ribbons, sketch outlines, highlights, and shadows.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#171717" flood-opacity=".18"/></filter>
+    <linearGradient id="mist" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".58" stop-color="#eef0f2"/><stop offset="1" stop-color="#8b9098" stop-opacity=".68"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1b9"/><stop offset=".48" stop-color="#ffbd24"/><stop offset="1" stop-color="#8d6100" stop-opacity=".72"/></linearGradient>
+    <linearGradient id="sage" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5fff7"/><stop offset=".52" stop-color="#d8e5dc"/><stop offset="1" stop-color="#4f755b" stop-opacity=".72"/></linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff8df"/><stop offset=".38" stop-color="#383838"/><stop offset="1" stop-color="#111"/></linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff4ef"/><stop offset=".5" stop-color="#f1c4b9"/><stop offset="1" stop-color="#9d5548" stop-opacity=".72"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff6ae"/><stop offset=".5" stop-color="#ffd34e"/><stop offset="1" stop-color="#9a6900" stop-opacity=".75"/></linearGradient>
+    <g id="medal-art" filter="url(#shadow)" stroke="#171717" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 5h12l3 18-10 6-9-19zM40 5h12l-4 24-10-6z" fill="currentColor" stroke-width="2.3"/>
+      <path d="M27 7l7 16M48 7l-5 20" stroke="#fff" stroke-width="1.5" opacity=".72"/>
+      <path d="M27 24l9 5 9-5 4 19-13 8-13-8z" fill="currentColor" opacity=".72" stroke-width="1.7"/>
+      <path d="M36 19c12 0 22 9 22 22 0 14-9 25-22 25S14 55 14 41c0-13 9-22 22-22Z" fill="currentColor" stroke-width="2.8"/>
+      <path d="M17 39c2-7 3-14 9-18l8 7 8-7c7 4 9 10 10 18" fill="none" stroke-width="2.2"/>
+      <path d="M18 39c7-2 11 1 18 0 7 1 11-2 18 0" stroke="#fff" stroke-width="1.4" opacity=".65"/>
+      <circle cx="27" cy="43" r="2.7" fill="#171717" stroke="none"/><circle cx="45" cy="43" r="2.7" fill="#171717" stroke="none"/>
+      <path d="M32 50q4 4 8 0" fill="none" stroke="#171717" stroke-width="2.2"/>
+      <circle cx="36" cy="48" r="1.8" fill="#171717" stroke="none"/>
+      <path d="M22 55c4 4 9 6 14 6s10-2 14-6" fill="none" stroke="#fff" stroke-width="1.5" opacity=".72" stroke-dasharray="2 2"/>
+      <path d="M17 35l-4 2M55 35l4 2M18 47l-4 1M54 47l4 1" stroke-width="1.4" opacity=".8"/>
+    </g>
+  </defs>
+  <rect width="1100" height="510" rx="36" fill="#f1f2f4"/>
+  <path d="M0 450c210-60 380 38 580-15s337-48 520 0v75H0Z" fill="#e7e8ea"/>
+  <text x="52" y="62" fill="#171717" font-family="Nunito,Arial,sans-serif" font-size="32" font-weight="900">Medals by XP</text>
+  <text x="52" y="91" fill="#85888e" font-family="Poppins,Arial,sans-serif" font-size="15">Sketch cat avatars with depth, ribbons, and earned shine</text>
+  <g font-family="Poppins,Arial,sans-serif" text-anchor="middle">
+    <g transform="translate(55 120)" color="#8b9098"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#f7f7f7"/><use href="#medal-art" x="36" y="54"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">Paw Seed</text><text x="72" y="270" fill="#85888e" font-size="13">0 XP</text><circle cx="123" cy="24" r="12" fill="#ffbd24" stroke="#fff" stroke-width="2"/><path d="m118 24 4 4 7-8" fill="none" stroke="#171717" stroke-width="2"/></g>
+    <g transform="translate(225 120)" color="#ffbd24"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#fffaf0"/><use href="#medal-art" x="36" y="54"/><path d="M125 37v9M120.5 41.5h9" stroke="#8d6100" stroke-width="1.5"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">First Paw</text><text x="72" y="270" fill="#85888e" font-size="13">24 XP</text><circle cx="123" cy="24" r="12" fill="#ffbd24" stroke="#fff" stroke-width="2"/><path d="m118 24 4 4 7-8" fill="none" stroke="#171717" stroke-width="2"/></g>
+    <g transform="translate(395 120)" color="#4f755b"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#f4faf5"/><use href="#medal-art" x="36" y="54"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">Alley Scout</text><text x="72" y="270" fill="#85888e" font-size="13">100 XP</text><circle cx="123" cy="24" r="12" fill="#ffbd24" stroke="#fff" stroke-width="2"/><path d="m118 24 4 4 7-8" fill="none" stroke="#171717" stroke-width="2"/></g>
+    <g transform="translate(565 120)" color="#ffbd24"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#f5f5f5"/><use href="#medal-art" x="36" y="54"/><circle cx="127" cy="40" r="3" fill="#ffbd24"/><path d="M127 27v26M114 40h26" stroke="#ffbd24" stroke-width="1.5"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">Night Watcher</text><text x="72" y="270" fill="#85888e" font-size="13">250 XP</text></g>
+    <g transform="translate(735 120)" color="#9d5548"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#fff7f4"/><use href="#medal-art" x="36" y="54"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">Naturalist</text><text x="72" y="270" fill="#85888e" font-size="13">500 XP</text></g>
+    <g transform="translate(905 120)" color="#9a6900"><rect x="0" y="0" width="145" height="300" rx="24" fill="#fff" stroke="#d8dadd"/><circle cx="72" cy="126" r="65" fill="#fffaf0"/><use href="#medal-art" x="36" y="54"/><path d="M122 38l4-8 4 8 8 4-8 4-4 8-4-8-8-4z" fill="#ffd34e" stroke="#9a6900" stroke-width="1.2"/><text x="72" y="247" fill="#171717" font-size="15" font-weight="900">Legend</text><text x="72" y="270" fill="#85888e" font-size="13">1000 XP</text></g>
+  </g>
+</svg>
