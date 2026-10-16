@@ -1,2 +1,3 @@
--- Adds the short observer note shown in a sighting's map detail popup.
-ALTER TABLE sightings ADD COLUMN description TEXT;
+-- The Worker creates this column defensively for both fresh and existing D1
+-- databases. Keep this migration as a no-op so a partially initialized
+-- database cannot fail deployment with "duplicate column name: description".
