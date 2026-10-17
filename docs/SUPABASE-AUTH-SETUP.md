@@ -1,6 +1,6 @@
 # Pawprint Supabase Auth setup
 
-Pawprint does not implement passwords, sessions, or social OAuth itself. The browser uses Supabase Auth with PKCE and the Worker verifies the Supabase access token through Supabase's `/auth/v1/user` endpoint.
+Pawprint does not implement passwords, sessions, or social OAuth itself. The browser uses Supabase Auth with PKCE and the `pawprint-api` Edge Function verifies the Supabase access token through Supabase's `/auth/v1/user` endpoint.
 
 ## Site environment variables
 

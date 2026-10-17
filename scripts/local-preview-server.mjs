@@ -168,14 +168,15 @@ async function proxyRemoteApi(request, url, response, origin, timeoutMs) {
   }
   const responseHeaders = {};
   upstream.headers.forEach((value, key) => {
-    if (key !== "content-encoding" && key !== "transfer-encoding") responseHeaders[key] = value;
+    if (key !== "content-encoding" && key !== "transfer-encoding" && key !== "content-length") responseHeaders[key] = value;
   });
   response.writeHead(upstream.status, responseHeaders);
   response.end(Buffer.from(await upstream.arrayBuffer()));
 }
 
 await loadLocalEnv();
-const remoteApiOrigin = String(process.env.PAWPRINT_API_ORIGIN || "").replace(/\/$/, "");
+const supabaseProjectUrl = String(process.env.PAWPRINT_SUPABASE_URL || process.env.SUPABASE_URL || "").replace(/\/$/, "");
+const supabaseFunctionOrigin = String(process.env.PAWPRINT_SUPABASE_FUNCTION_URL || (supabaseProjectUrl ? `${supabaseProjectUrl}/functions/v1/pawprint-api` : "")).replace(/\/$/, "");
 const remoteApiTimeoutMs = Math.max(1000, Number(process.env.PAWPRINT_API_TIMEOUT_MS || 12000));
 
 const server = createServer(async (request, response) => {
@@ -200,18 +201,18 @@ const server = createServer(async (request, response) => {
     response.end(JSON.stringify({
       ok: true,
       service: "pawprint-local-preview",
-      supabaseConfigured: Boolean(process.env.PAWPRINT_SUPABASE_URL && (process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
+      supabaseConfigured: Boolean((process.env.PAWPRINT_SUPABASE_URL || process.env.SUPABASE_URL) && (process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
       aiValidationConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.OLLAMA_BASE_URL || process.env.OLLAMA_API_URL || process.env.AI_VALIDATION_URL),
       brevoConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
       pushConfigured: Boolean(process.env.PUSH_PUBLIC_KEY),
-      persistence: remoteApiOrigin ? "remote-worker" : "preview-only",
-      backendOrigin: remoteApiOrigin || null,
+      persistence: supabaseFunctionOrigin ? "supabase-edge-function" : "preview-only",
+      backendOrigin: supabaseFunctionOrigin || null,
     }));
     return;
   }
-  if (remoteApiOrigin && url.pathname.startsWith("/api/") && url.pathname !== "/api/auth/config" && url.pathname !== "/api/health") {
+  if (supabaseFunctionOrigin && url.pathname.startsWith("/api/") && url.pathname !== "/api/auth/config" && url.pathname !== "/api/health") {
     try {
-      await proxyRemoteApi(request, url, response, remoteApiOrigin, remoteApiTimeoutMs);
+      await proxyRemoteApi(request, url, response, supabaseFunctionOrigin, remoteApiTimeoutMs);
     } catch (error) {
       const timedOut = error?.name === "AbortError";
       sendJson(response, { error: timedOut ? "REMOTE_API_TIMEOUT" : "REMOTE_API_UNAVAILABLE", detail: timedOut ? `The backend did not respond within ${remoteApiTimeoutMs}ms.` : String(error?.message || error) }, 502);

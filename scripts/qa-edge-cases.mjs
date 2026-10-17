@@ -8,7 +8,8 @@ const source = fs.readFileSync(path.join(root, "dist/server/index.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "dist/index.html"), "utf8");
 const worker = fs.readFileSync(path.join(root, "worker/index.template.js"), "utf8");
 const assets = fs.readFileSync(path.join(root, "assets/mobile-ui.js"), "utf8") + fs.readFileSync(path.join(root, "assets/offline-queue.js"), "utf8") + fs.readFileSync(path.join(root, "assets/admin-console.js"), "utf8");
-const deployment = fs.readFileSync(path.join(root, "wrangler.toml.example"), "utf8") + fs.readFileSync(path.join(root, "drizzle/0006_production_schema.sql"), "utf8");
+const supabaseApi = fs.readFileSync(path.join(root, "supabase/functions/pawprint-api/index.ts"), "utf8");
+const deployment = fs.readFileSync(path.join(root, "supabase/migrations/20261017000000_pawprint_app.sql"), "utf8") + fs.readFileSync(path.join(root, "docs/SUPABASE-APP-SETUP.md"), "utf8");
 const passed = [];
 const failed = [];
 const manual = [];
@@ -52,13 +53,13 @@ async function main() {
     ["Offline sighting queue", ["indexedDB", "OFFLINE_QUEUED", "pawprint-offline"]],
     ["Brevo waitlist confirmation", ["sendBrevoWaitlistEmail", "api.brevo.com/v3/smtp/email", "BREVO_API_KEY"]],
     ["Push subscription storage and service worker delivery", ["push_subscriptions", "pushManager.subscribe", "addEventListener('push'"]],
-    ["Scheduled expiry and regional rarity jobs", ["async scheduled", "expireSightingsInternal", "recalculateRegionalRarity", "crons ="]],
+    ["Supabase API and Storage persistence", ["SUPABASE_SERVICE_ROLE_KEY", "pawprint-sightings", "from(\"sightings\")", "storage_path"]],
     ["Admin moderation console", ["data-open-admin", "ADMIN_REQUIRED", "data-admin-action", "/api/admin/care-flags"]],
-    ["Production D1/R2 deployment config", ["d1_databases", "r2_buckets", "migrations_dir"]],
+    ["Supabase-only deployment config", ["supabase/functions/pawprint-api/index.ts", "supabase/migrations", "SUPABASE_SERVICE_ROLE_KEY", "pawprint-sightings"]],
   ];
   for (const [name, needles] of contractChecks) {
-    if (includesAll(source + html + worker + assets + deployment, needles)) pass(name, "source contract present");
-    else fail(name, `missing: ${needles.filter((needle) => !(source + html + worker + assets + deployment).includes(needle)).join(", ")}`);
+    if (includesAll(source + html + worker + assets + supabaseApi + deployment, needles)) pass(name, "source contract present");
+    else fail(name, `missing: ${needles.filter((needle) => !(source + html + worker + assets + supabaseApi + deployment).includes(needle)).join(", ")}`);
   }
 
   needsManual("Offline submit behavior", "An explicit offline submit guard is present; toggle the browser offline and confirm the sighting is not uploaded and the recovery message is clear.");
