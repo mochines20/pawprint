@@ -150,7 +150,7 @@ async function readBody(request) {
   return Buffer.concat(chunks);
 }
 
-async function proxyRemoteApi(request, url, response, origin) {
+async function proxyRemoteApi(request, url, response, origin, timeoutMs) {
   const target = `${origin}${url.pathname}${url.search}`;
   const headers = new Headers();
   for (const [key, value] of Object.entries(request.headers)) {
@@ -158,7 +158,14 @@ async function proxyRemoteApi(request, url, response, origin) {
     headers.set(key, value);
   }
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await readBody(request);
-  const upstream = await fetch(target, { method: request.method, headers, body });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let upstream;
+  try {
+    upstream = await fetch(target, { method: request.method, headers, body, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   const responseHeaders = {};
   upstream.headers.forEach((value, key) => {
     if (key !== "content-encoding" && key !== "transfer-encoding") responseHeaders[key] = value;
@@ -169,6 +176,7 @@ async function proxyRemoteApi(request, url, response, origin) {
 
 await loadLocalEnv();
 const remoteApiOrigin = String(process.env.PAWPRINT_API_ORIGIN || "").replace(/\/$/, "");
+const remoteApiTimeoutMs = Math.max(1000, Number(process.env.PAWPRINT_API_TIMEOUT_MS || 12000));
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
@@ -203,9 +211,10 @@ const server = createServer(async (request, response) => {
   }
   if (remoteApiOrigin && url.pathname.startsWith("/api/") && url.pathname !== "/api/auth/config" && url.pathname !== "/api/health") {
     try {
-      await proxyRemoteApi(request, url, response, remoteApiOrigin);
+      await proxyRemoteApi(request, url, response, remoteApiOrigin, remoteApiTimeoutMs);
     } catch (error) {
-      sendJson(response, { error: "REMOTE_API_UNAVAILABLE", detail: String(error?.message || error) }, 502);
+      const timedOut = error?.name === "AbortError";
+      sendJson(response, { error: timedOut ? "REMOTE_API_TIMEOUT" : "REMOTE_API_UNAVAILABLE", detail: timedOut ? `The backend did not respond within ${remoteApiTimeoutMs}ms.` : String(error?.message || error) }, 502);
     }
     return;
   }
