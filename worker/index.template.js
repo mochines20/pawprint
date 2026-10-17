@@ -10,12 +10,15 @@ const PAWLOADER_ACTUAL_JS = __PAWPRINT_PAWLOADER_ACTUAL_JS__;
 const PAWLOADER_CSS = __PAWPRINT_PAWLOADER_CSS__;
 const PAWLOADER_BRIDGE = __PAWPRINT_PAWLOADER_BRIDGE__;
 const PAWTRAIL_JS = __PAWPRINT_PAWTRAIL_JS__;
+const OFFLINE_QUEUE_JS = __PAWPRINT_OFFLINE_QUEUE_JS__;
+const ADMIN_CONSOLE_JS = __PAWPRINT_ADMIN_CONSOLE_JS__;
 const MOBILE_UI_JS = __PAWPRINT_MOBILE_UI_JS__;
 const MOBILE_UI_CSS = __PAWPRINT_MOBILE_UI_CSS__;
 const MOBILE_FONT = __PAWPRINT_MOBILE_FONT__;
 const MOBILE_FONT_LICENSE = __PAWPRINT_MOBILE_FONT_LICENSE__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Gotta spot ’em all—safely.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
 const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v8-reference-ui'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
+const PWA_SERVICE_WORKER_WITH_PUSH = `${PWA_SERVICE_WORKER} self.addEventListener('push',event=>{const data=event.data?event.data.json():{};event.waitUntil(self.registration.showNotification(data.title||'Pawprint',{body:data.body||'Your Pawprint has an update.',icon:'/assets/pawprint-icon.svg',badge:'/assets/pawprint-icon.svg',data:{url:data.url||'/#app'}}));}); self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{const target=event.notification.data&&event.notification.data.url||'/#app';const existing=list.find(client=>client.url.includes(location.origin));return existing?(existing.focus(),existing.navigate(target)):clients.openWindow(target);}));});`;
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -138,6 +141,37 @@ async function isAdmin(request, env) {
 async function createNotification(env, userId, type, title, body) {
   await env.DB.prepare("INSERT INTO notifications (id,user_id,type,title,body,created_at) VALUES (?,?,?,?,?,?)")
     .bind(id(), userId, type, title, body, now()).run();
+}
+
+async function sendBrevoWaitlistEmail(env, email, platformInterest) {
+  const apiKey = String(env.BREVO_API_KEY || "").trim();
+  const senderEmail = String(env.BREVO_SENDER_EMAIL || "").trim();
+  if (!apiKey || !senderEmail) return { sent: false, reason: "BREVO_NOT_CONFIGURED" };
+  const platform = platformInterest === "ios" ? "iOS" : platformInterest === "android" ? "Android" : "iOS & Android";
+  const payload = {
+    sender: { email: senderEmail, name: String(env.BREVO_SENDER_NAME || "Pawprint") },
+    to: [{ email }],
+    subject: "You’re on the Pawprint early-access list",
+  };
+  const templateId = Number(env.BREVO_TEMPLATE_ID);
+  if (Number.isInteger(templateId) && templateId > 0) {
+    payload.templateId = templateId;
+    payload.params = { platform, appName: "Pawprint" };
+    delete payload.subject;
+  } else {
+    payload.htmlContent = `<div style="font-family:Arial,sans-serif;line-height:1.5"><h1>Pawprint</h1><p>You’re on the early-access list for <strong>${platform}</strong>.</p><p>We’ll let you know when the browser and native app experience is ready.</p><p>Gotta spot ’em all.</p></div>`;
+  }
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", "api-key": apiKey },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) return { sent: false, reason: `BREVO_${response.status}` };
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: String(error?.message || "BREVO_UNAVAILABLE") };
+  }
 }
 
 function encodeGeohash(latitude, longitude, precision = 6) {
@@ -987,6 +1021,15 @@ async function getAdminAnalytics(request, env) {
   return json({ metrics: { users: Number(users?.total || 0), sightings: Number(sightings?.total || 0), acceptedPhotos: Number(accepted?.total || 0), activeUsers30d: Number(retention?.active_users || 0) }, generatedAt: now() });
 }
 
+async function getAdminCareFlags(request, env) {
+  if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
+  const rows = await env.DB.prepare(`SELECT care_flags.id,care_flags.kind,care_flags.note,care_flags.status,care_flags.created_at,
+      care_flags.sighting_id,sightings.cat_type,sightings.public_geohash
+      FROM care_flags LEFT JOIN sightings ON sightings.id=care_flags.sighting_id
+      WHERE care_flags.status='open' ORDER BY care_flags.created_at ASC LIMIT 200`).all();
+  return json({ items: rows.results });
+}
+
 async function getModerationQueue(request, env) {
   if (!(await isAdmin(request, env))) return json({ error: "ADMIN_REQUIRED" }, 403);
   const rows = await env.DB.prepare("SELECT id,target_type,target_id,reason,status,action,created_at,resolved_at FROM moderation_queue WHERE status='open' ORDER BY created_at ASC LIMIT 200").all();
@@ -1026,17 +1069,65 @@ async function createWaitlist(request, env) {
   const platformInterest = ["ios", "android", "ios_android"].includes(body.platformInterest) ? body.platformInterest : "ios_android";
   const source = String(body.source || "landing").trim().slice(0, 80) || "landing";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json({ error: "INVALID_EMAIL" }, 400);
+  const existing = await env.DB.prepare("SELECT email FROM waitlist_signups WHERE email=? LIMIT 1").bind(email).first();
+  if (existing) return json({ status: "already_subscribed", platformInterest }, 200);
   await env.DB.prepare("INSERT OR IGNORE INTO waitlist_signups (id,email,platform_interest,source,created_at) VALUES (?,?,?,?,?)")
     .bind(id(), email, platformInterest, source, now()).run();
-  return json({ status: "subscribed", platformInterest }, 201);
+  const emailResult = await sendBrevoWaitlistEmail(env, email, platformInterest);
+  return json({ status: "subscribed", platformInterest, confirmationEmail: emailResult.sent ? "sent" : "queued" }, 201);
+}
+
+async function expireSightingsInternal(env) {
+  const expired = await env.DB.prepare("UPDATE sightings SET validation_reason=COALESCE(validation_reason,'expired') WHERE expires_at <= ? AND validation_status='accepted' RETURNING id").bind(now()).all();
+  return { expiredCount: expired.results.length };
+}
+
+function regionalTier(sampleCount) {
+  const count = Number(sampleCount || 0);
+  if (count <= 1) return "Super Rare";
+  if (count <= 5) return "Rare";
+  if (count <= 20) return "Uncommon";
+  return "Common";
+}
+
+async function recalculateRegionalRarity(env) {
+  const rows = await env.DB.prepare(`SELECT COALESCE(public_geohash,'country') AS scope_key,COALESCE(cat_type,'Unclassified cat') AS cat_type,COUNT(*) AS sample_count
+    FROM sightings WHERE validation_status='accepted' AND captured_at>=datetime('now','-30 day') GROUP BY scope_key,cat_type`).all();
+  const calculatedAt = now();
+  const statements = [env.DB.prepare("DELETE FROM regional_rarity")];
+  for (const row of rows.results || []) statements.push(env.DB.prepare("INSERT INTO regional_rarity (scope_key,cat_type,sample_count,tier,calculated_at) VALUES (?,?,?,?,?)").bind(row.scope_key, row.cat_type, Number(row.sample_count || 0), regionalTier(row.sample_count), calculatedAt));
+  await env.DB.batch(statements);
+  return { updatedCount: rows.results?.length || 0, calculatedAt };
 }
 
 async function expireSightings(request, env) {
   const secret = env.EXPIRY_JOB_TOKEN;
   const auth = request.headers.get("authorization");
   if (!secret || auth !== `Bearer ${secret}`) return json({ error: "FORBIDDEN" }, 403);
-  const expired = await env.DB.prepare("UPDATE sightings SET validation_reason=COALESCE(validation_reason,'expired') WHERE expires_at <= ? AND validation_status='accepted' RETURNING id").bind(now()).all();
-  return json({ expiredCount: expired.results.length });
+  return json(await expireSightingsInternal(env));
+}
+
+async function savePushSubscription(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const endpoint = String(body.endpoint || "").trim();
+  const p256dh = String(body.keys?.p256dh || "").trim();
+  const auth = String(body.keys?.auth || "").trim();
+  if (!endpoint || !p256dh || !auth || endpoint.length > 2048) return json({ error: "INVALID_PUSH_SUBSCRIPTION" }, 400);
+  const timestamp = now();
+  await env.DB.prepare(`INSERT INTO push_subscriptions (id,user_id,endpoint,p256dh,auth,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,updated_at=excluded.updated_at`)
+    .bind(id(), user.id, endpoint, p256dh, auth, timestamp, timestamp).run();
+  return json({ status: "subscribed" }, 201);
+}
+
+async function removePushSubscription(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const endpoint = String(body.endpoint || "").trim();
+  if (!endpoint) return json({ error: "INVALID_PUSH_SUBSCRIPTION" }, 400);
+  await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?").bind(user.id, endpoint).run();
+  return json({ status: "unsubscribed" });
 }
 
 async function api(request, env, url) {
@@ -1047,6 +1138,8 @@ async function api(request, env, url) {
     authConfigured: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY),
     aiValidationConfigured: Boolean(env.GEMINI_API_KEY || env.OLLAMA_BASE_URL || env.OLLAMA_API_URL || env.AI_VALIDATION_URL),
     storageConfigured: Boolean(env.DB && env.BUCKET),
+    brevoConfigured: Boolean(env.BREVO_API_KEY && env.BREVO_SENDER_EMAIL),
+    pushConfigured: Boolean(env.PUSH_PUBLIC_KEY && env.PUSH_PRIVATE_KEY),
   });
   if (url.pathname === "/api/auth/config" && request.method === "GET") return json({ enabled: Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY), url: env.SUPABASE_URL || "", anonKey: env.SUPABASE_ANON_KEY || "", providers: { google: env.SUPABASE_GOOGLE_AUTH_ENABLED === "true", apple: env.SUPABASE_APPLE_AUTH_ENABLED === "true" } });
   if (url.pathname === "/api/capture-sessions" && request.method === "POST") return startCaptureSession(request, env);
@@ -1064,12 +1157,16 @@ async function api(request, env, url) {
   if (url.pathname === "/api/wrapped" && request.method === "GET") return getWrapped(request, env);
   if (url.pathname === "/api/share-card" && request.method === "GET") return getShareCard(request, env);
   if (url.pathname === "/api/admin/analytics" && request.method === "GET") return getAdminAnalytics(request, env);
+  if (url.pathname === "/api/admin/care-flags" && request.method === "GET") return getAdminCareFlags(request, env);
   if (url.pathname === "/api/admin/moderation" && request.method === "GET") return getModerationQueue(request, env);
   if (url.pathname.startsWith("/api/admin/moderation/") && request.method === "POST") return resolveModeration(request, env, url.pathname.split("/").pop());
   if (url.pathname.startsWith("/api/admin/care-flags/") && request.method === "PATCH") return resolveCareFlag(request, env, url.pathname.split("/").pop());
   if (url.pathname === "/api/admin/partner-reports" && request.method === "GET") return getPartnerReports(request, env);
   if (url.pathname === "/api/admin/partner-reports" && request.method === "POST") return createPartnerReport(request, env);
   if (url.pathname === "/api/waitlist" && request.method === "POST") return createWaitlist(request, env);
+  if (url.pathname === "/api/push/config" && request.method === "GET") return json({ configured: Boolean(env.PUSH_PUBLIC_KEY), publicKey: env.PUSH_PUBLIC_KEY || null });
+  if (url.pathname === "/api/push/subscriptions" && request.method === "POST") return savePushSubscription(request, env);
+  if (url.pathname === "/api/push/subscriptions" && request.method === "DELETE") return removePushSubscription(request, env);
   if (url.pathname === "/api/me" && request.method === "GET") {
     return getProfile(request, env);
   }
@@ -1088,6 +1185,11 @@ async function api(request, env, url) {
   if (url.pathname === "/api/export" && request.method === "POST") return exportUser(request, env);
   if (url.pathname === "/api/account" && request.method === "DELETE") return deleteUser(request, env);
   if (url.pathname === "/api/jobs/expire" && request.method === "POST") return expireSightings(request, env);
+  if (url.pathname === "/api/jobs/rarity" && request.method === "POST") {
+    const secret = env.EXPIRY_JOB_TOKEN;
+    if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return json({ error: "FORBIDDEN" }, 403);
+    return json(await recalculateRegionalRarity(env));
+  }
   return json({ error: "NOT_FOUND" }, 404);
 }
 
@@ -1097,7 +1199,7 @@ export default {
     try {
       if (url.pathname.startsWith("/api/")) return await api(request, env, url);
       if (request.method === "GET" && url.pathname === "/manifest.webmanifest") return new Response(PWA_MANIFEST, { headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=3600" } });
-      if (request.method === "GET" && url.pathname === "/sw.js") return new Response(PWA_SERVICE_WORKER, { headers: { "content-type": "application/javascript", "cache-control": "public, max-age=3600" } });
+      if (request.method === "GET" && url.pathname === "/sw.js") return new Response(PWA_SERVICE_WORKER_WITH_PUSH, { headers: { "content-type": "application/javascript", "cache-control": "public, max-age=3600" } });
       if (request.method === "GET" && url.pathname === "/assets/pawprint-sneak-peek.gif") {
         const binary = atob(SNEAK_PEEK_GIF);
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -1130,6 +1232,12 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/pawtrail.js") {
         return new Response(PAWTRAIL_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
       }
+      if (request.method === "GET" && url.pathname === "/assets/offline-queue.js") {
+        return new Response(OFFLINE_QUEUE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/admin-console.js") {
+        return new Response(ADMIN_CONSOLE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
+      }
       if (request.method === "GET" && url.pathname === "/assets/fredoka-latin.woff2") {
         return new Response(Uint8Array.from(atob(MOBILE_FONT), c => c.charCodeAt(0)), { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=86400" } });
       }
@@ -1155,5 +1263,9 @@ export default {
       console.error(error);
       return json({ error: error?.message || "INTERNAL_ERROR" }, 500);
     }
+  },
+  async scheduled(event, env, ctx) {
+    const work = event.cron === "17 3 * * *" ? Promise.all([expireSightingsInternal(env), recalculateRegionalRarity(env)]) : expireSightingsInternal(env);
+    ctx.waitUntil(work);
   },
 };

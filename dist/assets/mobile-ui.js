@@ -112,7 +112,7 @@
         const language=window.pawprintProfile?.language||'en';
         privacy.insertAdjacentHTML('beforeend',`<button class="pw-more-button" data-edit-language>Language <strong>${esc({en:'English',fil:'Filipino',es:'Spanish',ja:'Japanese'}[language]||language)} ›</strong></button>`);
       }
-      settings.insertAdjacentHTML('beforeend','<button class="pw-more-button" type="button" data-more-open>More tools <span>›</span></button>');
+      settings.insertAdjacentHTML('beforeend','<button class="pw-more-button" type="button" data-enable-push>Enable reminders <strong>›</strong></button><button class="pw-more-button" type="button" data-more-open>More tools <span>›</span></button>');
     }
   }
   function recent(entries) {
@@ -148,6 +148,20 @@
     const status=document.getElementById('pwCaptureStatus'),caption=document.getElementById('pwShutterCaption');
     if(status){status.textContent=label;status.dataset.state=state;}
     if(caption)caption.textContent=state==='checking'?'Checking cat…':state==='ready'?'Capture and verify':'Start camera';
+  }
+  const base64Key=value=>{const padding='='.repeat((4-value.length%4)%4),base=(value+padding).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(base),char=>char.charCodeAt(0));};
+  async function enablePush(button) {
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){window.notify?.('Push reminders are not supported in this browser.');return;}
+    try{
+      const config=await fetch('/api/push/config',{credentials:'include'}).then(response=>response.json());
+      if(!config.configured||!config.publicKey){window.notify?.('Push reminders are not configured yet. In-app notifications remain available.');return;}
+      const permission=await Notification.requestPermission();if(permission!=='granted'){window.notify?.('Notifications are blocked. Allow them in your browser settings to enable reminders.');return;}
+      const registration=await navigator.serviceWorker.ready;
+      const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:base64Key(config.publicKey)});
+      const response=await fetch('/api/push/subscriptions',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(subscription.toJSON())});
+      if(!response.ok)throw new Error('PUSH_SUBSCRIBE_FAILED');
+      button.textContent='Reminders enabled';button.disabled=true;window.notify?.('Pawprint reminders are enabled.');
+    }catch{window.notify?.('Push reminders could not be enabled yet. You can still use in-app notifications.');}
   }
   function syncLandingShowcase() {
     const showcase=document.querySelector('.showcase');
@@ -195,6 +209,7 @@
     if(event.target.closest('button[data-ui-theme]')){const dark=document.documentElement.dataset.uiTheme!=='dark';document.documentElement.dataset.uiTheme=dark?'dark':'light';try{localStorage.setItem('pawprint-ui-theme',dark?'dark':'light');}catch{}}
     if(event.target.closest('[data-more-open]'))document.querySelector('.app-sidebar [data-screen="more"]')?.click();
     if(event.target.closest('[data-edit-language]')){const panel=document.querySelector('.pw-edit-profile:has(#profileForm)');if(panel){panel.open=true;document.getElementById('profileLanguage')?.focus();}}
+    const pushButton=event.target.closest('[data-enable-push]');if(pushButton){event.preventDefault();enablePush(pushButton);}
     if(event.target.closest('#captureBtn,[data-open-capture]'))queueMicrotask(()=>{const modal=document.getElementById('captureModal');if(modal?.classList.contains('open')){modal.scrollTop=0;modal.querySelector('.pw-screen-header button')?.focus();}});
   });
   try{document.documentElement.dataset.uiTheme=localStorage.getItem('pawprint-ui-theme')||'light';}catch{}

@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/embed-html.mjs",
+    "start": "node scripts/local-preview-server.mjs",
+    "start:remote": "node scripts/local-preview-server.mjs",
     "qa:edge": "node scripts/qa-edge-cases.mjs",
+    "qa:production": "node scripts/qa-production.mjs",
     "qa:mobile": "node scripts/qa-mobile-ui.mjs",
     "test:loader": "node --test scripts/test-paw-loader.mjs"
   }

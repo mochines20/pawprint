@@ -60,6 +60,7 @@ const previewState = {
   careFlags: [],
   notifications: [],
   sessions: new Map(),
+  pushSubscriptions: [],
   waitlist: [],
   community: [],
 };
@@ -193,6 +194,8 @@ const server = createServer(async (request, response) => {
       service: "pawprint-local-preview",
       supabaseConfigured: Boolean(process.env.PAWPRINT_SUPABASE_URL && (process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
       aiValidationConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.OLLAMA_BASE_URL || process.env.OLLAMA_API_URL || process.env.AI_VALIDATION_URL),
+      brevoConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
+      pushConfigured: Boolean(process.env.PUSH_PUBLIC_KEY),
       persistence: remoteApiOrigin ? "remote-worker" : "preview-only",
       backendOrigin: remoteApiOrigin || null,
     }));
@@ -231,6 +234,24 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === "/api/notifications" && request.method === "GET") {
     sendJson(response, { notifications: previewState.notifications, demo: true });
+    return;
+  }
+  if (url.pathname === "/api/push/config" && request.method === "GET") {
+    sendJson(response, { configured: Boolean(process.env.PUSH_PUBLIC_KEY), publicKey: process.env.PUSH_PUBLIC_KEY || null, demo: true });
+    return;
+  }
+  if (url.pathname === "/api/push/subscriptions" && request.method === "POST") {
+    const body = await readJson(request);
+    if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) { sendJson(response, { error: "INVALID_PUSH_SUBSCRIPTION" }, 400); return; }
+    previewState.pushSubscriptions = previewState.pushSubscriptions.filter(item => item.endpoint !== body.endpoint);
+    previewState.pushSubscriptions.push({ endpoint: body.endpoint, createdAt: new Date().toISOString() });
+    sendJson(response, { status: "subscribed", demo: true }, 201);
+    return;
+  }
+  if (url.pathname === "/api/push/subscriptions" && request.method === "DELETE") {
+    const body = await readJson(request);
+    previewState.pushSubscriptions = previewState.pushSubscriptions.filter(item => item.endpoint !== body.endpoint);
+    sendJson(response, { status: "unsubscribed", demo: true });
     return;
   }
   if (url.pathname.startsWith("/api/notifications/") && request.method === "PATCH") {
