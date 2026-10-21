@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Pawprint",
+    "slug": "pawprint",
+    "scheme": "pawprint",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+      "newArchEnabled": true,
+    "icon": "./assets/logo.png",
+    "splash": { "image": "./assets/logo.png", "resizeMode": "contain", "backgroundColor": "#FAF8F4" },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pawprint.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pawprint uses the camera so you can photograph street cats. Photos are camera-only and location data is removed.",
+        "NSLocationWhenInUseUsageDescription": "Pawprint uses your location to show cats nearby. Pins are always shown as approximate areas."
+      }
+    },
+    "android": {
+      "package": "com.pawprint.app",
+      "permissions": ["CAMERA", "ACCESS_COARSE_LOCATION"],
+      "adaptiveIcon": { "foregroundImage": "./assets/logo.png", "backgroundColor": "#FAF8F4" }
+    },
+    "plugins": [
+      "expo-font",
+        "@maplibre/maplibre-react-native",
+      ["expo-camera", { "cameraPermission": "Pawprint uses the camera so you can photograph street cats." }],
+      ["expo-location", { "locationWhenInUsePermission": "Pawprint shows cats near you as approximate areas." }],
+      ["expo-image-picker", { "photosPermission": "Choose a cat photo from your library." }]
+    ],
+    "extra": {}
+  }
+}
