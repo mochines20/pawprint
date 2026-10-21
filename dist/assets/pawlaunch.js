@@ -6,6 +6,9 @@
   var WORD='Pawprint', TAG='Gotta spot \u2019em all.';
   function seen(){try{return sessionStorage.getItem('pawlaunch')==='1'}catch(e){return false}}
   function mark(){try{sessionStorage.setItem('pawlaunch','1')}catch(e){}}
+  function canHaptic(){
+    try{return !!(navigator.vibrate&&navigator.userActivation&&navigator.userActivation.hasBeenActive)}catch(e){return false}
+  }
   function show(o){
     o=o||{};
     if((o.once||'session')==='session'&&seen()){return Promise.resolve()}
@@ -35,7 +38,9 @@
       var minP=new Promise(function(r){setTimeout(r,minMs)});
       var maxP=new Promise(function(r){setTimeout(r,maxMs)});
       var rdy=Promise.resolve(rd).catch(function(){});
-      if(!calm&&navigator.vibrate&&o.haptic!==false)setTimeout(function(){if(!done)try{navigator.vibrate(12)}catch(e){}},1350);
+      // Browsers block vibration during an automatic page-load animation.
+      // Only request haptics after the user has interacted with this page.
+      if(!calm&&o.haptic!==false)setTimeout(function(){if(!done&&canHaptic())try{navigator.vibrate(12)}catch(e){}},1350);
       setTimeout(function(){if(!done){el.querySelector('.plx-stage').appendChild(dots)}},minMs+150);
       Promise.race([Promise.all([minP,rdy]),maxP]).then(finish);
     });
