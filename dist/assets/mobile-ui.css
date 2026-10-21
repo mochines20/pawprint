@@ -350,7 +350,7 @@ body.is-app #dashboard .pw-streak-card,body.is-app #dashboard .pw-goal-card{min-
 @keyframes pawprint-store-left{0%,18%{transform:translateX(0) rotate(-6deg)}38%{transform:translateX(13px) rotate(1deg)}45%{transform:translateX(22px) rotate(5deg) scale(1.04)}51%{transform:translateX(16px) rotate(-2deg)}62%,100%{transform:translateX(0) rotate(-6deg)}}
 @keyframes pawprint-store-right{0%,18%{transform:translateX(0) rotate(5deg)}38%{transform:translateX(-13px) rotate(-1deg)}45%{transform:translateX(-22px) rotate(-5deg) scale(1.04)}51%{transform:translateX(-16px) rotate(2deg)}62%,100%{transform:translateX(0) rotate(5deg)}}
 @keyframes pawprint-store-impact{0%,37%,58%,100%{opacity:0;transform:translate(-50%,-50%) scale(.35) rotate(-18deg)}43%{opacity:.15;transform:translate(-50%,-50%) scale(.7) rotate(8deg)}47%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(-8deg)}53%{opacity:0;transform:translate(-50%,-50%) scale(1.45) rotate(14deg)}}
-@media(max-width:700px){.store-badge .store-sketch-pair{align-self:center}}
+@media(max-width:700px){.store-badge{gap:14px;padding:18px 20px}.store-badge .store-sketch-pair{align-self:center;flex-basis:58px}}
 @media(prefers-reduced-motion:reduce){.store-sketch-pair .store-sketch,.store-sketch-pair:after{animation:none!important}.store-sketch-pair .store-sketch:nth-child(2){transform:rotate(5deg)}}
 
 /* Landing showcase mirrors the current mobile Home, Journal, and Profile screens. */

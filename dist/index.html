@@ -464,7 +464,7 @@
   </style>
   <link rel="stylesheet" href="/assets/pawlaunch.css?v=launch-20261019-1">
   <link rel="stylesheet" href="/assets/pawonboard.css?v=onboard-20261021-1">
-  <link rel="stylesheet" href="/assets/mobile-ui.css?v=reference-20261021-7">
+  <link rel="stylesheet" href="/assets/mobile-ui.css?v=reference-20261021-9">
 </head>
 <body>
   <script src="/assets/pawlaunch.js?v=launch-20261019-1"></script>
@@ -473,7 +473,7 @@
   </script>
   <script src="/assets/pawprint-cat-onboard.js?v=onboard-20261021-1"></script>
   <script src="/assets/pawonboard.js?v=onboard-20261021-1"></script>
-  <script src="/assets/mobile-ui.js?v=reference-20261021-7"></script>
+  <script src="/assets/mobile-ui.js?v=reference-20261021-9"></script>
   <script src="/assets/pawtrail.js?v=reference-20261016-1"></script>
   <script src="/assets/offline-queue.js?v=offline-20261017-1"></script>
   <script src="/assets/admin-console.js?v=admin-20261017-1"></script>
@@ -1024,7 +1024,10 @@
         .demo-profile-avatar{display:grid;place-items:center;width:44px;height:44px;margin:0 auto 7px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 1px rgba(23,23,23,.08)}
         .demo-profile-avatar svg{width:38px;height:38px;display:block}.demo-profile-card strong,.demo-profile-card small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}.demo-profile-card strong{color:#171717;font-size:.72rem}.demo-profile-card small{margin-top:3px;color:#7b7e84;font-size:.59rem;line-height:1.35}.demo-profile-stat{margin-top:7px;color:#6e4b00!important;font-weight:850}
         .demo-lock-card .btn{position:relative;z-index:1}
-        .demo-demo-hint{margin:0 0 4px!important;color:#6e4b00!important;font-size:.74rem!important;font-weight:800}
+        .demo-demo-hint{width:100%;margin:0 auto 4px!important;color:#6e4b00!important;font-size:.74rem!important;font-weight:800;text-align:center}
+        .demo-landing-button{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;margin-top:14px;padding:10px 16px;border:1px solid rgba(23,23,23,.18);border-radius:999px;background:#171717;color:#fff;font:inherit;font-size:.74rem;font-weight:850;text-decoration:none;transition:transform .18s ease,background .18s ease}
+        .demo-landing-button:hover,.demo-landing-button:focus-visible{background:#333;transform:translateY(-2px)}
+        .demo-landing-button:focus-visible{outline:3px solid var(--amber,#ffb815);outline-offset:3px}
         .demo-profile-view{width:min(100%,620px);max-height:calc(100vh - 28px);overflow:auto;padding:18px;border:2px solid var(--ink,#171717);border-radius:28px;background:#171717;color:#fff;box-shadow:0 24px 70px rgba(23,23,23,.28);text-align:left}
         .demo-prototype-view{width:min(100%,440px);height:min(calc(100vh - 28px),900px);display:flex;flex-direction:column;padding:12px;overflow:hidden}.demo-prototype-frame{display:block;flex:1;width:100%;min-height:0;border:0;border-radius:24px;background:#e9e6df}.demo-prototype-view .demo-app-bar{flex:none;margin-bottom:10px}
         .demo-profile-view button{font:inherit}
@@ -1100,7 +1103,7 @@
           layer.innerHTML = `<div class="demo-profile-view demo-prototype-view"><div class="demo-app-bar"><button type="button" data-demo-back aria-label="Back to sample profiles">← Back</button><span>Pawprint demo</span><span class="demo-demo-badge">No account needed</span></div><iframe class="demo-prototype-frame" title="Pawprint mobile demo" src="/pawprint-prototype.html?profile=${prototypeProfile}&embed=1"></iframe></div>`;
           layer.querySelector('[data-demo-back]')?.addEventListener('click', () => { body.classList.remove('demo-profile-open'); layer.remove(); ensureLayer(); });
         };
-        layer.innerHTML = `<div class="demo-lock-card"><div class="demo-lock-paws" aria-hidden="true"><span>🐾</span><span>🐾</span><span>🐾</span></div><span class="eyebrow">Demo overview</span><h2>See how Pawprint feels.</h2><p>Explore the mobile layout and flow without signing in. Real captures, private Journal data, and community actions stay locked behind an account.</p><section class="demo-preview-accounts" aria-label="Fictional demo profiles"><div class="demo-preview-heading"><span>Sample profiles</span><span>Demo only · not real users</span></div><div class="demo-profile-strip">${fakeProfileCards}</div></section><p class="demo-demo-hint">Tap a sample profile to open the demo system.</p></div>`;
+        layer.innerHTML = `<div class="demo-lock-card"><div class="demo-lock-paws" aria-hidden="true"><span>🐾</span><span>🐾</span><span>🐾</span></div><span class="eyebrow">Demo overview</span><h2>See how Pawprint feels.</h2><p>Explore the mobile layout and flow without signing in. Real captures, private Journal data, and community actions stay locked behind an account.</p><section class="demo-preview-accounts" aria-label="Fictional demo profiles"><div class="demo-preview-heading"><span>Sample profiles</span><span>Demo only · not real users</span></div><div class="demo-profile-strip">${fakeProfileCards}</div></section><p class="demo-demo-hint">Tap a sample profile to open the demo system.</p><a class="demo-landing-button" href="/#top">← Back to landing page</a></div>`;
         layer.querySelectorAll('[data-demo-profile]').forEach(button => button.addEventListener('click', () => openDemoProfile(button.dataset.demoProfile)));
         app.appendChild(layer);
       };
