@@ -1,0 +1,114 @@
+/* PawLoader – lightweight SVG loaders for Pawprint. Animates transform/opacity only. */
+.pl{
+  --pl-ink:#151515; --pl-fg:#151515; --pl-paper:#FAF8F4; --pl-accent:#FFB400;
+  --pl-line:#E4E1DA; --pl-stone:#8C8A84; --pl-rim:transparent; --pl-eye-ring:transparent;
+  display:inline-flex; flex-direction:column; align-items:center; gap:10px;
+  color:var(--pl-fg); line-height:1; contain:layout paint;
+}
+/* dark surfaces: set data-theme="dark" (or class pl-dark) on the loader or any ancestor */
+:is([data-theme="dark"],.pl-dark) .pl{
+  --pl-fg:#FAF8F4; --pl-line:#3A3A3C; --pl-stone:#A9A7A0; --pl-rim:#8C8A84; --pl-eye-ring:#8C8A84;
+}
+.pl-sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.pl svg{display:block;overflow:visible}
+.pl-lg svg{width:148px;height:148px}.pl-md svg{width:92px;height:92px}.pl-sm svg{width:44px;height:44px}
+.pl-paws.pl-lg svg{width:200px;height:64px}.pl-paws.pl-md svg{width:130px;height:42px}.pl-paws.pl-sm svg{width:76px;height:24px}
+.pl-tap.pl-lg svg{width:56px;height:56px}.pl-tap.pl-md svg{width:32px;height:32px}.pl-tap.pl-sm svg{width:18px;height:18px}
+.pl-tap{display:inline-flex;flex-direction:row}
+.pl-cap{font:600 15px/1.2 'Fredoka',system-ui,sans-serif;color:var(--pl-stone);min-height:1.2em;text-align:center;transition:opacity .25s}
+.pl-sm .pl-cap,.pl-tap .pl-cap{display:none}
+.pl-cap.pl-swap{opacity:0}
+.pl-retry{font:600 14px 'Fredoka',system-ui,sans-serif;margin-top:4px;padding:8px 14px;border:2px solid var(--pl-ink);border-radius:12px;background:var(--pl-accent);color:#151515;box-shadow:3px 3px 0 #151515;cursor:pointer}
+.pl-retry:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #151515}
+
+/* shared look */
+.pl .ink{fill:var(--pl-ink)} .pl .fg{fill:var(--pl-fg)} .pl .amber{fill:var(--pl-accent)}
+.pl .rim{fill:none;stroke:var(--pl-rim);stroke-linecap:round}
+.pl .body{fill:none;stroke:var(--pl-ink);stroke-linecap:round}
+.pl .track{fill:none;stroke:var(--pl-line);stroke-width:2;stroke-dasharray:1.5 7;stroke-linecap:round}
+
+/* ---------- chase: cat curled into a ring, head chasing its tail ---------- */
+.pl-spin{transform-origin:60px 60px;animation:pl-spin 1.5s linear infinite}
+.pl-tailwag{transform-origin:60px 60px;animation:pl-wag .42s ease-in-out infinite alternate}
+.pl-head{transform-origin:60px 24px;animation:pl-bob .36s ease-in-out infinite alternate}
+.pl-dust{transform-origin:60px 60px;animation:pl-dust 1.5s linear infinite}
+.pl-dizzy{opacity:0;transform-origin:60px 14px}
+@keyframes pl-spin{to{transform:rotate(360deg)}}
+@keyframes pl-wag{from{transform:rotate(-7deg)}to{transform:rotate(5deg)}}
+@keyframes pl-bob{from{transform:scale(.97,1.03) translateY(1px)}to{transform:scale(1.04,.97) translateY(-1px)}}
+@keyframes pl-dust{0%{opacity:.0}20%{opacity:.7}100%{opacity:0;transform:rotate(-40deg)}}
+
+/* ---------- paws: a trail of four prints ---------- */
+.pl-paw{transform-box:fill-box;transform-origin:center;opacity:0;animation:pl-step 2.1s cubic-bezier(.3,.7,.3,1) infinite}
+.pl-paw .pp{fill:var(--pl-fg);animation:pl-ink 2.1s linear infinite;animation-delay:inherit}
+@keyframes pl-step{
+  0%{opacity:0;transform:scale(.35) translateY(5px)}
+  9%{opacity:1;transform:scale(1.14) translateY(0)}
+  15%{transform:scale(1)}
+  70%{opacity:1;transform:scale(1)}
+  88%,100%{opacity:0;transform:scale(.96)}
+}
+@keyframes pl-ink{0%,8%{fill:var(--pl-fg)}10%,22%{fill:var(--pl-accent)}34%,100%{fill:var(--pl-fg)}}
+
+/* ---------- pin: paw presses a map pin into place ---------- */
+.pl-pin-g{transform-origin:60px 78px;animation:pl-drop 2.6s cubic-bezier(.4,0,.2,1) infinite}
+.pl-pin-paw{transform-box:fill-box;transform-origin:center;animation:pl-press 2.6s cubic-bezier(.4,0,.2,1) infinite;opacity:0}
+.pl-ripple{transform-origin:60px 80px;animation:pl-ripple 2.6s ease-out infinite;opacity:0}
+.pl-shadow{transform-origin:60px 80px;animation:pl-shadow 2.6s ease-out infinite}
+@keyframes pl-drop{
+  0%{transform:translateY(-62px) scale(1,1);opacity:0}
+  6%{opacity:1}
+  18%{transform:translateY(0) scale(1,1)}
+  22%{transform:translateY(0) scale(1.12,.84)}
+  30%{transform:translateY(-5px) scale(.96,1.05)}
+  36%,44%{transform:translateY(0) scale(1,1)}
+  50%{transform:translateY(0) scale(1.1,.86)}
+  58%{transform:translateY(-3px) scale(.98,1.03)}
+  64%,88%{transform:translateY(0) scale(1,1);opacity:1}
+  100%{transform:translateY(0) scale(1,1);opacity:0}
+}
+@keyframes pl-press{
+  0%,34%{transform:translateY(-34px);opacity:0}
+  40%{opacity:1}
+  47%{transform:translateY(-3px);opacity:1}
+  52%{transform:translateY(2px);opacity:1}
+  62%{transform:translateY(-30px);opacity:.0}
+  100%{transform:translateY(-34px);opacity:0}
+}
+@keyframes pl-ripple{
+  0%,16%{transform:scale(.25);opacity:0}
+  18%{opacity:.9}
+  38%{transform:scale(1.7);opacity:0}
+  48%{transform:scale(.25);opacity:0}
+  50%{opacity:.8}
+  68%,100%{transform:scale(1.5);opacity:0}
+}
+@keyframes pl-shadow{0%,14%{transform:scale(.3);opacity:0}20%{transform:scale(1);opacity:.3}50%{transform:scale(1.12)}90%{opacity:.3}100%{opacity:0}}
+
+/* ---------- tap: tiny paw for buttons (inherits currentColor) ---------- */
+.pl-tap{color:currentColor}
+.pl-tap-paw{transform-box:fill-box;transform-origin:50% 100%;animation:pl-tap .9s cubic-bezier(.45,0,.3,1) infinite}
+.pl-tap-ring{transform-origin:16px 26px;animation:pl-tapring .9s ease-out infinite;opacity:0}
+.pl-tap .tp{fill:currentColor}
+@keyframes pl-tap{
+  0%,100%{transform:translateY(-3px) scale(1,1)}
+  42%{transform:translateY(2px) scale(1.08,.86)}
+  60%{transform:translateY(-1px) scale(.98,1.04)}
+}
+@keyframes pl-tapring{0%,38%{transform:scale(.3);opacity:0}42%{opacity:.7}85%,100%{transform:scale(1.6);opacity:0}}
+
+/* ---------- calm motion: user toggle OR prefers-reduced-motion ---------- */
+@keyframes pl-calm{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){
+  .pl *{animation:none!important}
+  .pl-paw{opacity:1!important}
+  .pl-pin-g{opacity:1!important}.pl-pin-paw,.pl-ripple{opacity:0!important}
+  .pl-calm-target{animation:pl-calm 2.4s ease-in-out infinite!important}
+}
+:is([data-pl-calm],.pl-calm) .pl *{animation:none!important}
+:is([data-pl-calm],.pl-calm) .pl-paw{opacity:1!important}
+:is([data-pl-calm],.pl-calm) .pl-pin-g{opacity:1!important}
+:is([data-pl-calm],.pl-calm) .pl-pin-paw,:is([data-pl-calm],.pl-calm) .pl-ripple{opacity:0!important}
+:is([data-pl-calm],.pl-calm) .pl .pl-calm-target{animation:pl-calm 2.4s ease-in-out infinite!important}
+
+

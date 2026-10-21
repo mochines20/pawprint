@@ -1,0 +1,84 @@
+/* PawLaunch – launch screen for Pawprint. transform/opacity only. */
+.plx{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  background:#FAF8F4;color:#151515;--plx-amber:#FFB400;--plx-stone:#8C8A84;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  font-family:'Fredoka',system-ui,sans-serif;opacity:1;transition:opacity .45s ease,transform .45s ease}
+:is([data-theme="dark"],.pl-dark) .plx,.plx.plx-dark{background:#151515;color:#FAF8F4;--plx-stone:#A9A7A0}
+.plx.plx-out{opacity:0;transform:scale(1.04);pointer-events:none}
+.plx-stage{position:relative;width:min(86vw,340px);display:flex;flex-direction:column;align-items:center}
+.plx-art{position:relative;width:100%;aspect-ratio:320/360}
+.plx-art svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+
+/* paws walk up toward the spot */
+.plx-paw{opacity:0;transform-box:fill-box;transform-origin:center;animation:plx-step .45s cubic-bezier(.3,.7,.3,1) forwards,plx-gone .3s ease-in 1.15s forwards;animation-delay:calc(var(--i)*.2s + .05s),1.2s}
+.plx-paw .pp{fill:currentColor;animation:plx-ink .6s linear forwards;animation-delay:calc(var(--i)*.2s + .05s)}
+@keyframes plx-step{0%{opacity:0;transform:scale(.3) translateY(8px)}55%{opacity:1;transform:scale(1.15)}100%{opacity:.9;transform:scale(1)}}
+@keyframes plx-ink{0%,30%{fill:var(--plx-amber)}100%{fill:currentColor}}
+@keyframes plx-gone{to{opacity:0;transform:scale(.8)}}
+
+/* logo drops like a map pin */
+.plx-shadow{transform-origin:160px 276px;transform-box:view-box;opacity:0;animation:plx-shadow .5s ease-out 1s forwards}
+.plx-drop{transform-box:view-box;transform-origin:160px 276px;opacity:0;animation:plx-drop .7s cubic-bezier(.3,0,.4,1) 1s forwards}
+.plx-logo{fill:currentColor}
+.plx-ripple{transform-box:view-box;transform-origin:160px 276px;opacity:0;animation:plx-ripple .9s ease-out 1.5s forwards}
+.plx-ripple.b{animation-delay:1.68s}
+@keyframes plx-drop{
+  0%{opacity:0;transform:translateY(-120px) scale(.92,1.08)}
+  8%{opacity:1}
+  55%{transform:translateY(0) scale(1.14,.82)}
+  72%{transform:translateY(-16px) scale(.96,1.05)}
+  88%{transform:translateY(0) scale(1.04,.96)}
+  100%{opacity:1;transform:none}}
+@keyframes plx-shadow{0%{opacity:0;transform:scale(.3)}60%{opacity:.18;transform:scale(1)}100%{opacity:.14;transform:scale(1)}}
+@keyframes plx-ripple{0%{opacity:.7;transform:scale(.2)}100%{opacity:0;transform:scale(2.6)}}
+
+/* wordmark + tagline */
+.plx-word{display:flex;font-weight:700;font-size:clamp(34px,10vw,46px);letter-spacing:.01em;line-height:1;margin-top:2px}
+.plx-word span{display:inline-block;opacity:0;transform:translateY(14px);animation:plx-rise .45s cubic-bezier(.2,.9,.3,1.3) forwards;animation-delay:calc(1.6s + var(--k)*.045s)}
+.plx-word .dot{color:var(--plx-amber)}
+.plx-tag{margin-top:10px;font-weight:500;font-size:clamp(14px,4vw,17px);color:var(--plx-stone);opacity:0;animation:plx-fade .5s ease 2.05s forwards}
+@keyframes plx-rise{to{opacity:1;transform:none}}
+@keyframes plx-fade{to{opacity:1}}
+.plx-skip{position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));font:500 13px 'Fredoka',system-ui,sans-serif;color:var(--plx-stone);background:none;border:0;opacity:0;animation:plx-fade .4s ease 1s forwards;cursor:pointer;padding:8px}
+
+/* calm: no movement, just a soft fade-in of the finished logo */
+.plx-calm .plx-paw,.plx-calm .plx-shadow,.plx-calm .plx-ripple{display:none}
+.plx-calm .plx-drop,.plx-calm .plx-word span,.plx-calm .plx-tag{animation:plx-fade .5s ease forwards!important;animation-delay:0s!important;transform:none!important}
+.plx-calm .plx-tag{animation-delay:.15s!important}
+@media (prefers-reduced-motion:reduce){
+  .plx .plx-paw,.plx .plx-shadow,.plx .plx-ripple{display:none}
+  .plx .plx-drop,.plx .plx-word span,.plx .plx-tag{animation:plx-fade .5s ease forwards!important;animation-delay:0s!important;transform:none!important}
+  .plx{transition:opacity .3s ease;} .plx.plx-out{transform:none}
+}
+:is([data-theme="dark"],.pl-dark) .plx .plx-logo,.plx.plx-dark .plx-logo{filter:invert(1) brightness(.98)}
+
+/* v2 extras */
+.plx-disc{transform-box:view-box;transform-origin:160px 200px;opacity:0;transform:scale(.2);animation:plx-disc .55s cubic-bezier(.2,.9,.3,1.2) 1.22s forwards}
+@keyframes plx-disc{0%{opacity:0;transform:scale(.2)}40%{opacity:.22}100%{opacity:.16;transform:scale(1)}}
+.plx-lid{fill:currentColor;transform-box:fill-box;transform-origin:center;transform:scaleY(0);animation:plx-blink 2.4s ease-in-out -.1s infinite}
+@keyframes plx-blink{0%,92%,100%{transform:scaleY(0)}95.5%{transform:scaleY(1.05)}}
+.plx-drop{animation-name:plx-drop}
+.plx-dots{display:flex;gap:7px;margin-top:18px;position:absolute;bottom:-26px}
+.plx-dots i{width:8px;height:8px;border-radius:50%;background:var(--plx-amber);animation:plx-dot 1s ease-in-out infinite}
+.plx-dots i:nth-child(2){animation-delay:.15s}.plx-dots i:nth-child(3){animation-delay:.3s}
+@keyframes plx-dot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-6px);opacity:1}}
+.plx-out .plx-art{transform:scale(.9);transition:transform .45s ease}
+.plx-calm .plx-disc,.plx-calm .plx-lid{display:none}
+@media (prefers-reduced-motion:reduce){.plx .plx-disc,.plx .plx-lid,.plx .plx-dots i{animation:none}.plx .plx-disc,.plx .plx-lid{display:none}}
+
+/* v3: map backdrop + nearby-cat pings */
+.plx-map{position:absolute;inset:0;pointer-events:none;opacity:0;animation:plx-fade .8s ease .9s forwards;
+  background-image:radial-gradient(circle,rgba(140,138,132,.55) 1.4px,transparent 1.8px);background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 62%);mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 62%)}
+.plx-map{--o:.5}
+@keyframes plx-mapin{from{opacity:0;transform:scale(1.15)}to{opacity:.55;transform:none}}
+.plx-map{animation:plx-mapin 1s ease .9s forwards}
+.plx-ripple.c{animation-name:plx-ripple-big;animation-duration:1.4s;animation-delay:1.45s}
+@keyframes plx-ripple-big{0%{opacity:.45;transform:scale(.2)}100%{opacity:0;transform:scale(9)}}
+.plx-ping{opacity:0;animation:plx-fade .01s linear forwards;animation-delay:calc(1.85s + var(--k)*.14s)}
+.plx-pingin{transform-box:fill-box;transform-origin:50% 100%;transform:scale(0);animation:plx-pop .5s cubic-bezier(.2,.9,.3,1.5) forwards,plx-bob 2.2s ease-in-out infinite;animation-delay:calc(1.85s + var(--k)*.14s),calc(2.4s + var(--k)*.3s)}
+@keyframes plx-pop{0%{transform:scale(0) translateY(10px)}100%{transform:scale(1)}}
+@keyframes plx-bob{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1) translateY(-4px)}}
+.plx-calm .plx-ping,.plx-calm .plx-ripple.c{display:none}
+.plx-calm .plx-map{animation:plx-fade .5s ease forwards;transform:none}
+@media (prefers-reduced-motion:reduce){.plx .plx-ping{display:none}.plx .plx-map{animation:plx-fade .5s ease forwards;transform:none}}

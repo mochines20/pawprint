@@ -1,0 +1,31 @@
+const CACHE = 'pawprint-shell-v5';
+self.addEventListener('install', event => {
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE).then(cache => cache.add('/')));
+});
+self.addEventListener('activate', event => {
+  event.waitUntil(Promise.all([
+    self.clients.claim(),
+    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))),
+  ]));
+});
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const requestUrl = new URL(event.request.url);
+  const isNavigation = event.request.mode === 'navigate' || requestUrl.pathname === '/';
+  event.respondWith(
+    isNavigation
+      ? fetch(event.request).then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          return response;
+        }).catch(() => caches.match(event.request).then(cached => cached || caches.match('/')))
+      : caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+          if (requestUrl.origin === location.origin) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(event.request, copy));
+          }
+          return response;
+        }).catch(() => caches.match('/')))
+  );
+});
