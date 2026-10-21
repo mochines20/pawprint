@@ -22,12 +22,21 @@ Supabase CLI or the Supabase dashboard. Configure these Edge Function secrets:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY` or `OLLAMA_BASE_URL` and `OLLAMA_MODEL`
 - `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`
+- Optional `PAWPRINT_PUBLIC_URL`
 - `ADMIN_USER_IDS`
 - `PUSH_PUBLIC_KEY`, `PUSH_PRIVATE_KEY`, and `PUSH_SUBJECT`
 - `MAINTENANCE_TOKEN`
 
 Never put `SUPABASE_SERVICE_ROLE_KEY`, AI keys, Brevo keys, admin IDs, or the
 push private key in browser code.
+
+The waitlist confirmation email is already on-brand in the Edge Function. The
+function sends Pawprint's built-in responsive HTML directly through Brevo's
+transactional API, with the amber CTA, outlined card, actual Pawprint logo,
+privacy note, and mobile-safe layout. A Brevo template ID is not required.
+Set `PAWPRINT_PUBLIC_URL` to the production HTTPS URL to enable the email CTA
+and logo. Keep it blank in local preview so the email does not link to
+localhost.
 
 ## 3. Connect localhost
 
@@ -47,13 +56,27 @@ Add the local and production `/auth/callback` URLs in Supabase Authentication
 settings. Enable Google or Apple only after their provider credentials are
 configured.
 
-## 5. Scheduled maintenance
+## 5. Web Push notifications
 
-Use Supabase Cron or an external scheduler to call the `pawprint-maintenance`
-Edge Function with `Authorization: Bearer <MAINTENANCE_TOKEN>` for expired
-sightings and rarity snapshots. The browser does not perform privileged cleanup.
+The browser subscribes through the service worker and stores the subscription in
+`push_subscriptions`. The API sends encrypted Web Push messages when a user
+receives an app notification. VAPID keys stay in Edge Function secrets; only
+the public key is returned by `/api/push/config`.
 
-## 6. QA
+The production project has a VAPID key pair configured and the push sender uses
+the edge-native `@mmmike/web-push` implementation. Users still need to tap
+`Enable reminders` and grant browser notification permission. On iOS, the PWA
+must be installed to the Home Screen before Web Push is available.
+
+## 6. Scheduled maintenance
+
+The production project has an active Supabase Cron job named
+`pawprint-maintenance-every-15-minutes` (`*/15 * * * *`). It calls the
+`pawprint-maintenance` Edge Function with its bearer token read from Supabase
+Vault. The function expires old sightings and recalculates 30-day regional
+rarity snapshots. The browser does not perform privileged cleanup.
+
+## 7. QA
 
 Run the local build and browser checks first. Then run the authenticated matrix
 against the deployed function using two normal users and one admin: privacy

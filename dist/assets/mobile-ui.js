@@ -20,7 +20,7 @@
     return `<svg class="pw-cat ${active?'is-orange':'is-black'}" viewBox="0 0 100 110" aria-hidden="true"><path class="pw-cat-tail" d="M33 91C7 97 7 72 15 65"/><path class="pw-cat-fur" d="M32 93Q19 76 36 57Q67 47 78 76L82 97H39Z"/><path class="pw-cat-fur" d="M29 47 27 12 48 29Q56 26 64 29L85 12 84 48Q89 76 58 77 27 77 29 47Z"/><path class="pw-cat-ear" d="m33 23 2 19 11-9m32-10-2 19-10-9"/><ellipse class="pw-cat-eye" cx="46" cy="51" rx="10" ry="13"/><ellipse class="pw-cat-eye" cx="70" cy="51" rx="10" ry="13"/><ellipse fill="var(--pw-ink)" cx="49" cy="51" rx="5" ry="10"/><ellipse fill="var(--pw-ink)" cx="73" cy="51" rx="5" ry="10"/><g fill="var(--pw-white)"><circle cx="46" cy="45" r="3"/><circle cx="70" cy="45" r="3"/></g><path d="m55 65 4 3 4-3m-4 3q-4 6-8 1m8-1q4 6 8 1M45 32v9m10-11v9m10-9v9" fill="none" stroke="var(--pw-ink)" stroke-width="2.5" stroke-linecap="round"/><path d="m42 77 16 6 20-6-18 15Z" fill="var(--pw-amber)" stroke="var(--pw-ink)" stroke-width="2"/></svg>`;
   }
   const header = (title, left='back') => `<header class="pw-screen-header"><button type="button" class="pw-icon-button" data-goto-screen="home" aria-label="Back to Home">${icon(left)}</button><h2>${esc(title)}</h2><button type="button" class="pw-icon-button" data-ui-theme aria-label="Switch color theme">${icon('sun')}</button></header>`;
-  const loading = label => `<div class="pw-loading" role="status"><paw-loader variant="paws" size="sm" label="${esc(label)}"></paw-loader><span>${esc(label)}</span></div>`;
+  const loading = label => `<div class="pw-loading" role="status"><paw-loader variant="paws" size="md" label="${esc(label)}"></paw-loader><span class="pw-loading-copy">${esc(label)}</span></div>`;
   function medal(item) {
     const tone=['mist','amber','sage','ink','coral','gold'].includes(item.tone)?item.tone:'mist';
     return `<svg class="pw-medal pw-medal-${tone}" viewBox="0 0 80 112" role="img" aria-label="${esc(item.title)}${item.earned?', earned':', locked'}"><g stroke="var(--pw-ink)" stroke-width="2.4" stroke-linejoin="round"><path d="m9 4 17 0 22 42-15 10Z" fill="var(--medal-color)"/><path d="m54 4 17 0-24 52-16-10Z" fill="var(--medal-color)"/><path d="m17 6 20 40m26-40-21 40" stroke="var(--pw-white)" stroke-width="1.2" stroke-dasharray="3 2"/><circle cx="41" cy="77" r="34" fill="var(--pw-ink)"/><circle cx="39" cy="73" r="34" fill="var(--medal-color)"/><circle cx="39" cy="73" r="29" fill="var(--medal-light)"/><circle cx="39" cy="73" r="26" fill="none" stroke="var(--medal-color)" stroke-width="2" stroke-dasharray="2 2"/><path d="M23 74 22 54 35 62h8l13-8-1 20q3 18-16 18T23 74Z" fill="var(--pw-ink)"/><path d="m26 59 2 9 5-4m19-6-2 9-5-4" fill="var(--pw-ear)" stroke-width="1"/><g fill="var(--pw-amber)" stroke-width="1"><ellipse cx="31" cy="76" rx="4" ry="6"/><ellipse cx="47" cy="76" rx="4" ry="6"/></g><g fill="var(--pw-ink)" stroke="none"><ellipse cx="32" cy="77" rx="2" ry="4"/><ellipse cx="48" cy="77" rx="2" ry="4"/></g><g fill="var(--pw-white)" stroke="none"><circle cx="30" cy="73" r="1.5"/><circle cx="46" cy="73" r="1.5"/></g><path d="m37 84 2 2 2-2m-7 3q3 4 5-1 2 5 5 1" fill="none" stroke="var(--pw-ear)" stroke-width="1.3"/><path d="m38 98 1-3 1 3 4 1-3 2v3l-2-2-3 2v-3l-2-2Z" fill="var(--pw-amber)" stroke-width="1"/></g></svg>`;
@@ -28,7 +28,7 @@
   function home() {
     const name = window.pawprintPublicProfile?.nickname || window.pawprintProfile?.display_name || 'Cat spotter';
     const hour = Number(new Intl.DateTimeFormat('en',{hour:'numeric',hourCycle:'h23'}).format(new Date()));
-    return `<div class="screen-panel pw-screen pw-home"><header class="pw-home-header"><button class="pw-greeting" data-goto-screen="profile" aria-label="Open your profile"><span class="pw-avatar">${avatar(window.pawprintPublicProfile?.avatar)}</span><span><small>Good ${hour<12?'morning':hour<18?'afternoon':'evening'}</small><strong>${esc(name)}</strong></span></button><button class="pw-streak-pill" data-goto-screen="journal">${icon('flame')}<span data-streak-summary>Streak</span></button></header><div class="dashboard-grid pw-home-grid"><article class="app-card map-card pw-map-card"><div class="pw-map-frame"><div class="map-title">Philippines · public sightings</div><div class="app-map" aria-label="Approximate public cat sightings"></div><span class="pw-map-note">Approximate areas · delayed 5 min</span></div><div class="app-actions"><button class="btn btn-amber pw-spot-button" id="captureBtn">${icon('camera')} Spot a cat</button></div></article><article class="app-card metric-card pw-streak-card"><span data-streak-cat>${cat(false)}</span><div><small>Current streak</small><strong id="streakMetric">—</strong><small>days in a row</small></div></article><article class="app-card progress-card pw-goal-card"><h2>Today's small goal</h2><p>Spot 1 cat to keep it safe</p><div class="progress-track"><span id="dailyGoalProgress" style="width:0%"></span></div><strong id="dailyGoalMetric">—</strong></article><section class="pw-recent"><div class="pw-section-heading"><h2>Recent pawprints</h2><button class="pw-text-button" data-goto-screen="journal">View all</button></div><div id="journalList">${loading('Loading your pawprints')}</div></section></div></div>`;
+    return `<div class="screen screen-panel pw-screen pw-home" data-prototype-screen="home"><header class="pw-home-header"><button class="pw-greeting" data-goto-screen="profile" aria-label="Open your profile"><span class="pw-avatar">${avatar(window.pawprintPublicProfile?.avatar)}</span><span><small>Good ${hour<12?'morning':hour<18?'afternoon':'evening'}</small><strong>${esc(name)}</strong></span></button><button class="pw-streak-pill" data-goto-screen="journal">${icon('flame')}<span data-streak-summary>Streak</span></button></header><div class="pw-map-filters" aria-label="Map filters"><button class="pw-map-filter is-active" type="button">Nearby</button><button class="pw-map-filter" type="button">Today</button><button class="pw-map-filter pw-map-care-filter" type="button" data-goto-screen="care">${icon('care')} <span>Care flags</span><b data-care-count>0</b></button></div><button class="pw-map-locate" type="button" aria-label="Centre on my location" title="Centre on my location">⌖</button><div class="dashboard-grid pw-home-grid"><div class="pw-home-canvas"><article class="app-card map-card pw-map-card"><div class="pw-map-frame"><div class="map-title">Philippines · public sightings</div><div class="app-map" aria-label="Approximate public cat sightings"></div><span class="pw-map-note">Approximate areas · delayed 5 min</span></div><div class="app-actions"><button class="btn btn-amber pw-spot-button" id="captureBtn">${icon('camera')} Spot a cat</button></div></article><section class="pw-home-sheet sheet" id="homeSheet" data-snap="peek" role="region" aria-label="Your cats"><button class="pw-sheet-grab grab" type="button" aria-label="Resize your cat summary"><span></span></button><div class="pw-home-sheet-body sbody"><div class="pw-home-stat-grid"><article class="app-card metric-card pw-streak-card"><span data-streak-cat>${cat(true)}</span><div><small>Streak</small><strong id="streakMetric">—</strong><small>days in a row</small></div></article><article class="app-card progress-card pw-goal-card"><h2>Today's goal</h2><p>Spot 1 cat to keep it safe</p><div class="progress-track"><span id="dailyGoalProgress" style="width:0%"></span></div><strong id="dailyGoalMetric">—</strong></article></div><section class="pw-recent"><div class="pw-section-heading"><h2>Recent pawprints</h2><button class="pw-text-button" data-goto-screen="journal">View all</button></div><div id="journalList">${loading('Loading your pawprints')}</div></section></div></section></div></div></div>`;
   }
   // Rarity is supplied by the server. Unknown classifications remain unclassified.
   const rarity = entry => {
@@ -61,7 +61,10 @@
   function journal(entries, filter, page) {
     const filtered=filterEntries(entries,filter), pages=Math.max(1,Math.ceil(filtered.length/5)), start=Math.min(page,pages-1)*5;
     const found=new Set(entries.map(e=>coatKey(e.coatType||e.catType))),known=coats.filter(c=>found.has(coatKey(c))),missing=coats.find(c=>!found.has(coatKey(c)));
-    return `<div class="screen-panel pw-screen pw-journal">${header('Cat Journal','journal')}<div class="pw-collection-intro"><span class="eyebrow">Your private collection</span><h1>Every cat has a story.</h1><div class="pw-collection-summary"><progress value="${known.length}" max="${coats.length}" aria-label="Coat collection progress"></progress><strong>${known.length} of ${coats.length} coats</strong></div></div><div class="pw-filters" aria-label="Filter Cat Journal">${['all','common','uncommon','rare','first'].map(f=>`<button class="chip ${filter===f?'active':''}" aria-pressed="${filter===f}" data-journal-filter="${f}">${f==='first'?'First spots':f[0].toUpperCase()+f.slice(1)}</button>`).join('')}</div><div id="journalEntries" class="pw-entries">${filtered.length?filtered.slice(start,start+5).map(e=>row(e)).join(''):'<div class="pw-undiscovered"><span>?</span><div><strong>Not found yet</strong><small>Your next validated sighting could be the first.</small></div></div>'}</div>${pages>1?`<div class="journal-pagination"><span>${start+1}–${Math.min(start+5,filtered.length)} of ${filtered.length}</span><div><button class="btn btn-light" data-journal-page="prev" ${!page?'disabled':''}>Previous 5</button><button class="btn btn-amber" data-journal-page="next" ${page>=pages-1?'disabled':''}>Next 5</button></div></div>`:''}${filter==='all'&&entries.length&&missing?`<div class="pw-undiscovered pw-missing-coat"><span>?</span><div><strong>${esc(missing)}</strong><small>Not found yet</small></div></div>`:''}<section class="pw-week" data-streak-week>${loading('Loading your streak')}</section></div>`;
+    const emptyJournal=filter==='all'?'<div class="pw-undiscovered pw-empty-action"><span aria-hidden="true">?</span><div><strong>No pawprints yet</strong><small>Your first validated cat will appear here.</small><button type="button" class="btn btn-amber btn-small" data-open-capture>Spot a cat</button></div></div>':'<div class="pw-undiscovered"><span aria-hidden="true">?</span><div><strong>No cats in this filter</strong><small>Try another filter or validate a new sighting.</small></div></div>';
+    const cards=filtered.length?filtered.slice(start,start+5).map(e=>row(e)).join(''):emptyJournal;
+    const missingCard=filter==='all'&&entries.length&&missing?`<div class="pw-undiscovered pw-missing-coat"><span aria-hidden="true">?</span><div><strong>${esc(missing)}</strong><small>Not found yet</small><small>Keep exploring</small></div></div>`:'';
+    return `<div class="screen-panel pw-screen pw-journal">${header('Cat Journal','journal')}<div class="pw-collection-intro"><span class="eyebrow">Your private collection</span><h1>Every cat has a story.</h1><div class="pw-collection-summary"><progress value="${known.length}" max="${coats.length}" aria-label="Coat collection progress"></progress><strong>${known.length} of ${coats.length} coats</strong></div></div><div class="pw-filters" aria-label="Filter Cat Journal">${['all','common','uncommon','rare','first'].map(f=>`<button class="chip ${filter===f?'active':''}" aria-pressed="${filter===f}" data-journal-filter="${f}">${f==='first'?'First spots':f[0].toUpperCase()+f.slice(1)}</button>`).join('')}</div><div id="journalEntries" class="pw-entries">${cards}${missingCard}</div>${pages>1?`<div class="journal-pagination"><span>${start+1}–${Math.min(start+5,filtered.length)} of ${filtered.length}</span><div><button class="btn btn-light" data-journal-page="prev" ${!page?'disabled':''}>Previous 5</button><button class="btn btn-amber" data-journal-page="next" ${page>=pages-1?'disabled':''}>Next 5</button></div></div>`:''}<section class="pw-week" data-streak-week>${loading('Loading your streak')}</section></div>`;
   }
   function updateStreak(data) {
     if(!data)return;
@@ -73,12 +76,44 @@
       el.innerHTML=`<div class="pw-week-title">${cat(active)}<div><strong>${active?'Orange cat streak':'Start a new streak'}${current?' · '+current+' days':''}</strong><small>${esc(streak.helper||'Validate a cat photo to keep it glowing')}</small></div></div><div class="pw-week-days">${days.map(day=>`<span class="${day.status==='complete'?'complete':day.status==='freeze'?'frozen':''} ${day.isToday?'today':''}" aria-label="${esc(day.label+' '+day.number+': '+day.status)}"><b>${day.status==='complete'?'✓':day.status==='freeze'?'❄':''}</b><small>${esc(day.label)}</small></span>`).join('')}</div>`;
     });
   }
+  function bindHomeSheet() {
+    const sheet=document.getElementById('homeSheet'), grab=sheet?.querySelector('.pw-sheet-grab');
+    if(!sheet||!grab||grab.dataset.bound)return;
+    grab.dataset.bound='1';
+    const snaps=[{name:'full',visible:0},{name:'mid',visible:370},{name:'peek',visible:250}];
+    const sheetShift=visible=>Math.max(0,(sheet.offsetHeight||640)-(visible||sheet.offsetHeight||640));
+    const setSnap=(name,animate=true)=>{
+      const snap=snaps.find(item=>item.name===name)||snaps[2];
+      sheet.dataset.snap=snap.name;
+      sheet.classList.toggle('is-full',snap.name==='full');
+      const shift=sheetShift(snap.visible);
+      sheet.style.setProperty('--pw-sheet-visible',`${snap.visible||sheet.offsetHeight}px`);
+      if(!animate)sheet.style.transition='none';
+      sheet.style.setProperty('--pw-sheet-shift',`${shift}px`);
+      if(!animate){requestAnimationFrame(()=>{sheet.style.removeProperty('transition');});}
+    };
+    const initialSnap=()=>setSnap(sheet.dataset.snap,false);
+    initialSnap();
+    requestAnimationFrame(initialSnap);
+    setTimeout(initialSnap,120);
+    let dragging=false,startY=0,startShift=0;
+    if(window.ResizeObserver){
+      const resizeObserver=new ResizeObserver(()=>{if(!dragging)setSnap(sheet.dataset.snap,false);});
+      resizeObserver.observe(sheet);
+    }
+    grab.addEventListener('pointerdown',event=>{dragging=true;startY=event.clientY;startShift=Number.parseFloat(getComputedStyle(sheet).getPropertyValue('--pw-sheet-shift'))||0;grab.setPointerCapture?.(event.pointerId);sheet.classList.add('is-dragging');event.preventDefault();});
+    grab.addEventListener('pointermove',event=>{if(!dragging)return;const maxShift=sheetShift(250);const shift=Math.max(0,Math.min(maxShift,startShift+event.clientY-startY));sheet.style.setProperty('--pw-sheet-shift',`${shift}px`);});
+    const finish=()=>{if(!dragging)return;dragging=false;sheet.classList.remove('is-dragging');const shift=Number.parseFloat(getComputedStyle(sheet).getPropertyValue('--pw-sheet-shift'))||0;setSnap(snaps.reduce((best,item)=>Math.abs(sheetShift(item.visible)-shift)<Math.abs(sheetShift(best.visible)-shift)?item:best,snaps[0]).name);};
+    grab.addEventListener('pointerup',finish);grab.addEventListener('pointercancel',finish);
+    grab.addEventListener('keydown',event=>{if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;event.preventDefault();const index=snaps.findIndex(item=>item.name===sheet.dataset.snap);const next=event.key==='Home'?0:event.key==='End'?snaps.length-1:Math.max(0,Math.min(snaps.length-1,index+(event.key==='ArrowUp'?-1:1)));setSnap(snaps[next].name);});
+  }
   function mount(screen) {
     document.body.dataset.pwScreen=screen;
     if(screen==='profile') enhanceProfile();
     updateStreak(window.pawprintDashboard);
     document.querySelectorAll('.mobile-nav [data-screen]').forEach(b=>b.setAttribute('aria-current',b.dataset.screen===screen?'page':'false'));
     const greeting=document.querySelector('.pw-greeting strong');if(greeting)greeting.textContent=window.pawprintPublicProfile?.nickname||window.pawprintProfile?.display_name||'Cat spotter';
+    if(screen==='home')bindHomeSheet();
   }
   function enhanceProfile() {
     const panel=document.querySelector('.profile-screen-panel'); if(!panel)return;
@@ -117,7 +152,7 @@
   }
   function recent(entries) {
     const list=document.getElementById('journalList');if(!list)return;
-    list.innerHTML=entries.length?entries.slice(0,2).map(e=>row(e,true)).join(''):'<div class="pw-undiscovered"><span>?</span><div><strong>No pawprints yet</strong><small>Your first validated cat will appear here.</small></div></div>';
+    list.innerHTML=entries.length?entries.slice(0,2).map(e=>row(e,true)).join(''):'<div class="pw-undiscovered pw-empty-action"><span aria-hidden="true">?</span><div><strong>No pawprints yet</strong><small>Your first validated cat will appear here.</small><button type="button" class="btn btn-amber btn-small" data-open-capture>Spot a cat</button></div></div>';
   }
   function captureUI() {
     const modal=document.querySelector('#captureModal .modal');if(!modal)return;
@@ -205,14 +240,19 @@
       paw.style.setProperty('--o',onDark?'0.82':(paw.classList.contains('pt-a')?'0.4':'0.09'));
     });
   }
+  const themeStorageKey='pawprint-ui-theme-v2';
   document.addEventListener('click',event=>{
-    if(event.target.closest('button[data-ui-theme]')){const dark=document.documentElement.dataset.uiTheme!=='dark';document.documentElement.dataset.uiTheme=dark?'dark':'light';try{localStorage.setItem('pawprint-ui-theme',dark?'dark':'light');}catch{}}
+    if(event.target.closest('button[data-ui-theme]')){const dark=document.documentElement.dataset.uiTheme!=='dark';document.documentElement.dataset.uiTheme=dark?'dark':'light';try{localStorage.setItem(themeStorageKey,dark?'dark':'light');}catch{}}
+    const mapFilter=event.target.closest('.pw-map-filter');
+    if(mapFilter&&!mapFilter.dataset.gotoScreen){document.querySelectorAll('.pw-map-filter').forEach(button=>button.classList.toggle('is-active',button===mapFilter));}
+    const locate=event.target.closest('.pw-map-locate');
+    if(locate){locate.disabled=true;locate.textContent='…';navigator.geolocation?.getCurrentPosition(()=>{locate.textContent='✓';locate.disabled=false;setTimeout(()=>{locate.textContent='⌖'},1200)},()=>{locate.textContent='!';locate.disabled=false;setTimeout(()=>{locate.textContent='⌖'},1200)});}
     if(event.target.closest('[data-more-open]'))document.querySelector('.app-sidebar [data-screen="more"]')?.click();
     if(event.target.closest('[data-edit-language]')){const panel=document.querySelector('.pw-edit-profile:has(#profileForm)');if(panel){panel.open=true;document.getElementById('profileLanguage')?.focus();}}
     const pushButton=event.target.closest('[data-enable-push]');if(pushButton){event.preventDefault();enablePush(pushButton);}
     if(event.target.closest('#captureBtn,[data-open-capture]'))queueMicrotask(()=>{const modal=document.getElementById('captureModal');if(modal?.classList.contains('open')){modal.scrollTop=0;modal.querySelector('.pw-screen-header button')?.focus();}});
   });
-  try{document.documentElement.dataset.uiTheme=localStorage.getItem('pawprint-ui-theme')||'light';}catch{}
+  try{document.documentElement.dataset.uiTheme=localStorage.getItem(themeStorageKey)||'dark';}catch{document.documentElement.dataset.uiTheme='dark';}
   window.addEventListener('pawprint-profile-ready',()=>{const greeting=document.querySelector('.pw-greeting strong'),art=document.querySelector('.pw-greeting .pw-avatar');if(greeting)greeting.textContent=window.pawprintPublicProfile?.nickname||'Cat spotter';if(art)art.innerHTML=avatar(window.pawprintPublicProfile?.avatar);});
   window.PawprintUI={home,journal,filterEntries,mount,updateStreak,recent,captureStatus,icon,esc,medal,mapPin};
   document.addEventListener('DOMContentLoaded',()=>{

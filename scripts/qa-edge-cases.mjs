@@ -39,6 +39,7 @@ async function main() {
 
   const contractChecks = [
     ["Reject non-cat/person/screenshot/AI images", ["IMAGE_NOT_A_CAT", "PERSON_DETECTED", "SCREENSHOT_DETECTED", "AI_GENERATED_IMAGE", "validation.status"]],
+    ["AI provider fallback and timeout", ["runOllama", "runGemini", "const order = provider === \"ollama\" ? [\"ollama\", \"gemini\"]", "AbortSignal.timeout(25000)"]],
     ["Duplicate image protection", ["photo_hash", "DUPLICATE_IMAGE"]],
     ["Capture-time freshness protection", ["CAPTURE_TIME_INVALID", "10 * 60 * 1000"]],
     ["Double-submit idempotency", ["request_keys", "idempotencyKey", "existingRequest"]],

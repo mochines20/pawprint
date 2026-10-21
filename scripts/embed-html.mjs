@@ -4,6 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const template = fs.readFileSync(path.join(root, "worker", "index.template.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "dist", "index.html"), "utf8");
+const adminHtml = fs.readFileSync(path.join(root, "dist", "admin.html"), "utf8");
 const sneakPeek = fs.readFileSync(path.join(root, "assets", "pawprint-sneak-peek.gif")).toString("base64");
 const sneakPeekSvg = fs.readFileSync(path.join(root, "assets", "pawprint-sneakpeek.svg"), "utf8");
 const icon = fs.readFileSync(path.join(root, "assets", "pawprint-icon.svg"), "utf8");
@@ -14,15 +15,23 @@ const pawLoader = fs.readFileSync(path.join(root, "assets", "paw-loader.js"), "u
 const pawloaderActual = fs.readFileSync(path.join(root, "assets", "pawloader.js"), "utf8");
 const pawloaderCss = fs.readFileSync(path.join(root, "assets", "pawloader.css"), "utf8");
 const pawloaderBridge = fs.readFileSync(path.join(root, "assets", "pawloader-bridge.js"), "utf8");
+const pawLaunchJs = fs.readFileSync(path.join(root, "assets", "pawlaunch.js"), "utf8");
+const pawLaunchCss = fs.readFileSync(path.join(root, "assets", "pawlaunch.css"), "utf8");
+const pawOnboardJs = fs.readFileSync(path.join(root, "assets", "pawonboard.js"), "utf8");
+const pawOnboardCss = fs.readFileSync(path.join(root, "assets", "pawonboard.css"), "utf8");
+const pawOnboardCat = fs.readFileSync(path.join(root, "assets", "pawprint-cat-onboard.js"), "utf8");
 const pawtrail = fs.readFileSync(path.join(root, "assets", "pawtrail.js"), "utf8");
 const offlineQueue = fs.readFileSync(path.join(root, "assets", "offline-queue.js"), "utf8");
 const adminConsole = fs.readFileSync(path.join(root, "assets", "admin-console.js"), "utf8");
+const adminApp = fs.readFileSync(path.join(root, "assets", "admin-app.js"), "utf8");
+const adminCss = fs.readFileSync(path.join(root, "assets", "admin-app.css"), "utf8");
 const mobileUi = fs.readFileSync(path.join(root, "assets", "mobile-ui.js"), "utf8");
 const mobileCss = fs.readFileSync(path.join(root, "assets", "mobile-ui.css"), "utf8");
 const mobileFont = fs.readFileSync(path.join(root, "assets", "fredoka-latin.woff2")).toString("base64");
 const mobileFontLicense = fs.readFileSync(path.join(root, "assets", "Fredoka-OFL.txt"), "utf8");
 const output = template
   .replace("__PAWPRINT_HTML__", JSON.stringify(html))
+  .replace("__PAWPRINT_ADMIN_HTML__", JSON.stringify(adminHtml))
   .replace("__PAWPRINT_SNEAK_PEEK_GIF__", sneakPeek)
   .replace("__PAWPRINT_SNEAK_PEEK_SVG__", JSON.stringify(sneakPeekSvg))
   .replace("__PAWPRINT_ICON_SVG__", JSON.stringify(icon))
@@ -33,9 +42,16 @@ const output = template
   .replace("__PAWPRINT_PAWLOADER_ACTUAL_JS__", JSON.stringify(pawloaderActual))
   .replace("__PAWPRINT_PAWLOADER_CSS__", JSON.stringify(pawloaderCss))
   .replace("__PAWPRINT_PAWLOADER_BRIDGE__", JSON.stringify(pawloaderBridge))
+  .replace("__PAWPRINT_PAWLAUNCH_JS__", JSON.stringify(pawLaunchJs))
+  .replace("__PAWPRINT_PAWLAUNCH_CSS__", JSON.stringify(pawLaunchCss))
+  .replace("__PAWPRINT_PAWONBOARD_JS__", JSON.stringify(pawOnboardJs))
+  .replace("__PAWPRINT_PAWONBOARD_CSS__", JSON.stringify(pawOnboardCss))
+  .replace("__PAWPRINT_PAWONBOARD_CAT__", JSON.stringify(pawOnboardCat))
   .replace("__PAWPRINT_PAWTRAIL_JS__", JSON.stringify(pawtrail))
   .replace("__PAWPRINT_OFFLINE_QUEUE_JS__", JSON.stringify(offlineQueue))
   .replace("__PAWPRINT_ADMIN_CONSOLE_JS__", JSON.stringify(adminConsole))
+  .replace("__PAWPRINT_ADMIN_APP_JS__", JSON.stringify(adminApp))
+  .replace("__PAWPRINT_ADMIN_APP_CSS__", JSON.stringify(adminCss))
   .replace("__PAWPRINT_MOBILE_UI_JS__", JSON.stringify(mobileUi))
   .replace("__PAWPRINT_MOBILE_UI_CSS__", JSON.stringify(mobileCss))
   .replace("__PAWPRINT_MOBILE_FONT__", JSON.stringify(mobileFont))
@@ -48,10 +64,13 @@ fs.copyFileSync(path.join(root, "assets", "paw-loader.js"), path.join(root, "dis
 fs.copyFileSync(path.join(root, "assets", "pawloader.js"), path.join(root, "dist", "assets", "pawloader.js"));
 fs.copyFileSync(path.join(root, "assets", "pawloader.css"), path.join(root, "dist", "assets", "pawloader.css"));
 fs.copyFileSync(path.join(root, "assets", "pawloader-bridge.js"), path.join(root, "dist", "assets", "pawloader-bridge.js"));
+for (const asset of ["pawlaunch.js", "pawlaunch.css", "pawonboard.js", "pawonboard.css", "pawprint-cat-onboard.js"]) fs.copyFileSync(path.join(root, "assets", asset), path.join(root, "dist", "assets", asset));
 for (const asset of ["mobile-ui.js", "mobile-ui.css", "fredoka-latin.woff2", "Fredoka-OFL.txt"]) fs.copyFileSync(path.join(root, "assets", asset), path.join(root, "dist", "assets", asset));
 fs.copyFileSync(path.join(root, "assets", "pawtrail.js"), path.join(root, "dist", "assets", "pawtrail.js"));
 fs.copyFileSync(path.join(root, "assets", "offline-queue.js"), path.join(root, "dist", "assets", "offline-queue.js"));
 fs.copyFileSync(path.join(root, "assets", "admin-console.js"), path.join(root, "dist", "assets", "admin-console.js"));
+fs.copyFileSync(path.join(root, "assets", "admin-app.js"), path.join(root, "dist", "assets", "admin-app.js"));
+fs.copyFileSync(path.join(root, "assets", "admin-app.css"), path.join(root, "dist", "assets", "admin-app.css"));
 fs.writeFileSync(path.join(root, "dist", "server", "index.js"), output);
 fs.writeFileSync(path.join(root, "dist", "sw.js"), `${serviceWorker}\n`);
 console.log("Generated dist/server/index.js");

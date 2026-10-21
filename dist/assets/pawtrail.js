@@ -14,8 +14,12 @@
       'opacity:0;transform:rotate(var(--r)) scale(.4);will-change:transform,opacity;fill:var(--pt-c)}' +
     '.pt-p.pt-a{fill:var(--pt-a)}' +
     '.pt-p.pt-in{animation:pt-stamp .55s cubic-bezier(.3,.7,.3,1) both}' +
+    '.pt-p.pt-retrace{animation:pt-retrace .48s cubic-bezier(.3,.7,.3,1) both}' +
     '.pt-p.pt-now{opacity:var(--o);transform:rotate(var(--r)) scale(1);animation:none}' +
+    '.pt-p.pt-walking{animation:pt-walk .52s ease-in-out infinite alternate}' +
     '@keyframes pt-stamp{0%{opacity:0;transform:rotate(var(--r)) scale(.4)}60%{opacity:var(--o);transform:rotate(var(--r)) scale(1.18)}100%{opacity:var(--o);transform:rotate(var(--r)) scale(1)}}' +
+    '@keyframes pt-retrace{0%{opacity:0;transform:translateY(7px) rotate(var(--r)) scale(.55)}65%{opacity:var(--o);transform:translateY(-2px) rotate(var(--r)) scale(1.08)}100%{opacity:var(--o);transform:rotate(var(--r)) scale(1)}}' +
+    '@keyframes pt-walk{0%{transform:rotate(var(--r)) translateY(1px) scale(.94)}100%{transform:rotate(var(--r)) translateY(-3px) scale(1.04)}}' +
     '@media (prefers-reduced-motion:reduce){.pt-p{opacity:var(--o);transform:rotate(var(--r)) scale(1);animation:none!important}}' +
     '@media print{.pt-layer{display:none}}';
 
@@ -54,8 +58,79 @@
     layer.style.setProperty('--pt-c', o.color); layer.style.setProperty('--pt-a', o.accent);
     o.parent.appendChild(layer);
 
-    var io = null, revealedUpTo = 0, destroyed = false, rt = null, ro = null;
+    var io = null, destroyed = false, rt = null, ro = null;
     var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var lastScrollY = window.scrollY || window.pageYOffset || 0;
+    var lastDirection = 1, scrollTimer = null, scrollRaf = null, walkTimer = null, activePaw = null;
+
+    function pawY(paw) { return parseFloat(paw.style.top || '0'); }
+
+    function stopWalking() {
+      clearTimeout(walkTimer);
+      walkTimer = null;
+      if (activePaw) activePaw.classList.remove('pt-walking');
+      activePaw = null;
+    }
+
+    function replay(paw, reverse) {
+      if (!paw || reduce) return;
+      paw.classList.remove('pt-in', 'pt-retrace', 'pt-now', 'pt-walking');
+      // Restart the CSS animation without a JS animation loop.
+      void paw.offsetWidth;
+      paw.classList.add(reverse ? 'pt-retrace' : 'pt-in');
+    }
+
+    function nearestPaw(y, direction) {
+      var paws = Array.prototype.slice.call(layer.querySelectorAll('.pt-p'));
+      if (!paws.length) return null;
+      var vh = window.innerHeight || 800;
+      var target = y + (direction > 0 ? vh * 0.78 : vh * 0.22);
+      return paws.reduce(function (closest, paw) {
+        return Math.abs(pawY(paw) - target) < Math.abs(pawY(closest) - target) ? paw : closest;
+      }, paws[0]);
+    }
+
+    function setActivePaw(paw, reverse) {
+      if (!paw) return;
+      stopWalking();
+      activePaw = paw;
+      if (reverse) {
+        replay(paw, true);
+        walkTimer = setTimeout(function () {
+          if (activePaw === paw) paw.classList.add('pt-walking');
+        }, 500);
+      } else if (!reduce) {
+        paw.classList.add('pt-walking');
+      }
+    }
+
+    function onScrollFrame() {
+      scrollRaf = null;
+      if (destroyed) return;
+      var y = window.scrollY || window.pageYOffset || 0;
+      var delta = y - lastScrollY;
+      if (Math.abs(delta) < 1) return;
+      var direction = delta > 0 ? 1 : -1;
+      var directionChanged = direction !== lastDirection;
+      lastDirection = direction;
+      lastScrollY = y;
+
+      var paw = nearestPaw(y, direction);
+      if (paw && paw !== activePaw) {
+        setActivePaw(paw, direction < 0 || directionChanged);
+      } else if (paw && direction < 0 && directionChanged) {
+        setActivePaw(paw, true);
+      }
+
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function () {
+        stopWalking();
+      }, 180);
+    }
+
+    function onScroll() {
+      if (scrollRaf === null) scrollRaf = window.requestAnimationFrame(onScrollFrame);
+    }
 
     function build() {
       if (io) io.disconnect();
@@ -94,6 +169,8 @@
         frag.appendChild(el); count++;
       }
       layer.appendChild(frag);
+      lastScrollY = window.scrollY || window.pageYOffset || 0;
+      stopWalking();
 
       if (!reduce && 'IntersectionObserver' in window) {
         io = new IntersectionObserver(function (entries) {
@@ -112,14 +189,15 @@
     var n = build();
     window.addEventListener('resize', schedule, { passive: true });
     window.addEventListener('load', schedule);
+    window.addEventListener('scroll', onScroll, { passive: true });
     if ('ResizeObserver' in window) { ro = new ResizeObserver(schedule); ro.observe(doc.body); }
 
     return {
       el: layer, count: function () { return layer.querySelectorAll('.pt-p').length; },
       refresh: build,
       destroy: function () {
-        destroyed = true; clearTimeout(rt); if (io) io.disconnect(); if (ro) ro.disconnect();
-        window.removeEventListener('resize', schedule); window.removeEventListener('load', schedule);
+        destroyed = true; clearTimeout(rt); clearTimeout(scrollTimer); clearTimeout(walkTimer); if (scrollRaf !== null) window.cancelAnimationFrame(scrollRaf); if (io) io.disconnect(); if (ro) ro.disconnect();
+        window.removeEventListener('resize', schedule); window.removeEventListener('load', schedule); window.removeEventListener('scroll', onScroll);
         if (layer.parentNode) layer.parentNode.removeChild(layer);
       }
     };

@@ -27,7 +27,7 @@ Supabase Auth and the privacy-limited `profiles` table remain the identity/profi
 
 The platform endpoints now include `/api/map` (zoom-aware privacy-safe clusters), `/api/progress`, `/api/leaderboards`, `/api/calendar`, `/api/notifications`, `/api/wrapped`, `/api/share-card`, `/api/community`, `/api/rescue-requests`, `/api/community-assets`, and admin-only analytics/moderation/partner report reads. The browser registers `/sw.js` and advertises `/manifest.webmanifest` for installable PWA behavior with an offline shell fallback.
 
-The Supabase API exposes Brevo-backed waitlist confirmation, Web Push subscription registration, a protected admin moderation console, and the API hooks needed by scheduled maintenance. The local preview proxies API calls to `PAWPRINT_SUPABASE_FUNCTION_URL`; otherwise it remains an intentionally resettable preview.
+The Supabase API exposes Brevo-backed waitlist confirmation, encrypted Web Push subscription and delivery, a protected admin moderation console, and scheduled maintenance for expiry and rarity snapshots. The local preview proxies API calls to `PAWPRINT_SUPABASE_FUNCTION_URL`; otherwise it remains an intentionally resettable preview.
 
 Progress also returns six XP medals (`Paw Seed` through `Pawprint Legend`). Their thresholds are enforced by the Supabase API and earned IDs are persisted in `user_badges`, while the browser renders the medal artwork as inline sketch-style SVGs alongside the cat avatar system.
 

@@ -17,6 +17,11 @@ const context=await browser.newContext({viewport:{width:390,height:844},serviceW
 // Authentication is stubbed only inside this isolated test browser; no production bypass.
 await context.route('**/assets/supabase-auth*.js*',route=>route.fulfill({contentType:'application/javascript',body:`window.pawprintAuthGate={ready:true,queue:[]};window.pawprintSession={user:{id:'qa-only'}};window.pawprintPublicProfile={nickname:'QA spotter',avatar:'cat-tangerine'};window.dispatchEvent(new CustomEvent('pawprint-authenticated',{detail:{continueToApp:true}}));`}));
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.addInitScript(()=>{
+  // This isolated browser supplies authenticated fixtures; production stays public-demo-only.
+  Object.defineProperty(window,'PAWPRINT_PUBLIC_DEMO_ONLY',{configurable:false,writable:false,value:false});
+  localStorage.setItem('pawprint-ui-theme-v2','light');
+});
 const entries=Array.from({length:8},(_,i)=>({id:'qa-'+i,sightingId:'qa-'+i,catType:['Orange tabby','Calico','Black cat','Tuxedo'][i%4],rarity:['Common','Rare','Super Rare','Uncommon'][i%4],spottedAt:new Date().toISOString(),firstSpotted:i<4,visibility:i%2?'private':'friends',description:'A calm cat sitting safely under a shaded walkway.',locationLabel:'Approximate Alabang area',photoUrl:'/assets/cat-tabby-gravel.webp'}));
 const medals=['Paw Seed','First Paw','Alley Scout','Night Watcher','Street Naturalist','Pawprint Legend'].map((title,i)=>({id:'qa-medal-'+i,title,xpRequired:[0,24,100,250,500,1000][i],earned:i<3,tone:['mist','amber','sage','ink','coral','gold'][i]}));
 let profile={display_name:'QA spotter',language:'en',time_zone:'Asia/Manila'},saveCount=0,captureCount=0,failJournal=false,failProgress=false;
@@ -41,6 +46,8 @@ try{
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   for(const match of html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/type=['"](?:module|application\/ld\+json)/.test(match[1]))new Function(match[2]);}
   await page.goto(origin+'/?ui=reference-1#app',{waitUntil:'domcontentloaded'});
+  const onboardingSkip=page.locator('.pob-skip');
+  try{await onboardingSkip.waitFor({state:'visible',timeout:5000});await onboardingSkip.click();await page.locator('.pob').waitFor({state:'detached'});}catch(error){if(!/Timeout/.test(String(error?.name||error)))throw error;}
   await page.locator('.pw-home').waitFor();
   await page.waitForTimeout(1800);
   assert.equal(await page.locator('[data-streak-summary]').innerText(),'4 day streak');
@@ -108,7 +115,7 @@ try{
     }
     console.log('PASS responsive screens at '+width+'px');
   }
-  await page.setViewportSize({width:360,height:800});await nav('home').click();await page.locator('#captureBtn').click();
+  await page.setViewportSize({width:360,height:800});await nav('home').click();await page.locator('.app-main>.mobile-nav .mobile-capture').click();
   const captureOverflow=await page.locator('#captureModal').evaluate(el=>el.scrollWidth>el.clientWidth+1);assert.equal(captureOverflow,false);
   await page.locator('#captureModal').evaluate(el=>el.scrollTop=el.scrollHeight);
   await page.screenshot({path:fileURLToPath(new URL('capture-bottom-360.png',out))});

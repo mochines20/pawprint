@@ -5,6 +5,15 @@
 body.is-app{background:var(--pw-paper);color:var(--pw-text)}
 .pw-icon{display:block;flex-shrink:0;width:24px;height:24px}
 .pw-cat{width:80px;max-width:100%;height:auto;display:block}.pw-cat-fur{fill:var(--pw-orange);stroke:var(--pw-ink);stroke-width:3;stroke-linejoin:round}.is-black .pw-cat-fur{fill:var(--pw-ink);stroke:var(--pw-stone)}.pw-cat-tail{fill:none;stroke:var(--pw-orange);stroke-width:9;stroke-linecap:round}.is-black .pw-cat-tail{stroke:var(--pw-stone)}.pw-cat-ear{fill:var(--pw-ear)}.pw-cat-eye{fill:var(--pw-amber);stroke:var(--pw-ink);stroke-width:2}
+:root[data-ui-theme=dark] .pw-streak-card .is-black .pw-cat-fur,:root[data-ui-theme=dark] .pw-week .is-black .pw-cat-fur,:root[data-ui-theme=dark] .streak-cat-badge.is-broken .pw-cat-fur{fill:var(--pw-white)!important;stroke:var(--pw-white)!important}
+:root[data-ui-theme=dark] .pw-streak-card .is-black .pw-cat-tail,:root[data-ui-theme=dark] .pw-week .is-black .pw-cat-tail,:root[data-ui-theme=dark] .streak-cat-badge.is-broken .pw-cat-tail{stroke:var(--pw-white)!important}
+:root[data-ui-theme=dark] .streak-cat-badge.is-broken svg path[fill="#171717"]{fill:var(--pw-white)!important}
+:root[data-ui-theme=dark] .streak-cat-badge.is-broken svg circle[fill="#fff"]{fill:var(--pw-ink)!important}
+:root[data-ui-theme=dark] #dashboard .data-card{color:var(--pw-ink)}
+:root[data-ui-theme=dark] #dashboard .data-card h3,:root[data-ui-theme=dark] #dashboard .data-card .panel-intro h2{color:var(--pw-ink)!important}
+:root[data-ui-theme=dark] #dashboard .data-card .panel-intro p{color:var(--pw-stone)}
+:root[data-ui-theme=dark] #dashboard .data-card .entry-badge{border:1.5px solid var(--pw-ink);color:var(--pw-ink);background:var(--pw-amber)}
+:root[data-ui-theme=dark] #dashboard .data-card .empty-state{border-color:var(--pw-stone);color:var(--pw-stone)}
 body.is-app .app-header:has(~ #dashboard .pw-screen){display:none}
 body.is-app #dashboard:has(>.pw-screen){display:block}
 body.is-app .pw-screen{width:100%;min-width:0;color:var(--pw-text);font-family:Nunito,Poppins,sans-serif}
@@ -111,6 +120,228 @@ body.is-app #dashboard .pw-streak-card,body.is-app #dashboard .pw-goal-card{min-
   body.is-app #captureModal .pw-capture-privacy{margin-top:12px}
 }
 
+/* Keep the prototype's floating controls above MapLibre's canvas and controls.
+   Some browser/MapLibre combinations create an extra stacking context for the
+   map, so the controls need an explicit isolated layer. */
+@media(max-width:600px){
+  html:has(body.is-app),
+  body.is-app,
+  html:has(.pw-home),
+  body:has(.pw-home){overflow:hidden!important}
+  body.is-app .app-view,
+  body:has(.pw-home) .app-view{position:fixed!important;top:12px!important;left:50%!important;transform:translateX(-50%)!important;margin:0!important}
+  body.is-app .pw-home,
+  body:has(.pw-home) .pw-home{isolation:isolate;overflow:clip!important}
+  body.is-app .pw-home-header,
+  body:has(.pw-home) .pw-home-header{display:flex!important;visibility:visible!important;position:absolute!important;top:10px!important;left:12px!important;right:12px!important;z-index:100!important}
+  body.is-app .pw-map-filters,
+  body:has(.pw-home) .pw-map-filters{display:flex!important;visibility:visible!important;z-index:101!important}
+  body.is-app .pw-map-locate,
+  body:has(.pw-home) .pw-map-locate{display:grid!important;visibility:visible!important;z-index:101!important}
+}
+
+/* Exact mobile reference pass: dark-first surfaces, outlined phone geometry,
+   thumb-zone navigation, and the same collectible card language as the
+   supplied pawprint-prototype (1).html. Light mode remains available through
+   the existing theme toggle. */
+:root[data-ui-theme=dark]{
+  --pw-paper:#151515;
+  --pw-surface:#242427;
+  --pw-text:#faf8f4;
+  --pw-muted:#a9a7a0;
+  --pw-line:#3a3a3e;
+  --pw-white:#faf8f4;
+  --pw-edge:#f2efe8;
+  --pw-shadow:#000;
+}
+
+@media(max-width:900px){
+  html:has(body.is-app),body.is-app{background:#070707;color:var(--pw-text)}
+  :root[data-ui-theme=dark] body.is-app .app-view,
+  :root[data-ui-theme=dark] body.is-app #dashboard,
+  :root[data-ui-theme=dark] body.is-app .pw-screen{background:var(--pw-paper);color:var(--pw-text)}
+  :root[data-ui-theme=dark] body.is-app .app-view{border-color:var(--pw-edge);box-shadow:6px 6px 0 var(--pw-shadow)}
+  :root[data-ui-theme=dark] body.is-app .pw-screen-header .pw-icon-button[data-ui-theme]{opacity:0;pointer-events:auto}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet{background:var(--pw-paper);border-color:var(--pw-edge);box-shadow:0 -2px 0 var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-streak-card{background:#151515;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card h2,
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card #dailyGoalMetric{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card p,
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card small{color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-goal-card .progress-track{background:#3a3a3e}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-recent .pw-entry{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-recent .pw-entry-copy strong{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-recent .pw-entry-copy small{color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .pw-home-sheet .pw-recent .pw-rarity{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-greeting,
+  :root[data-ui-theme=dark] body.is-app .pw-streak-pill,
+  :root[data-ui-theme=dark] body.is-app .pw-map-filter,
+  :root[data-ui-theme=dark] body.is-app .pw-map-locate{background:#151515;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-greeting small{color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map{background:#2a2a2d}
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map.live-map .maplibregl-canvas{filter:grayscale(1) brightness(.34) contrast(1.12)}
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map.live-map .maplibregl-ctrl-group,
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map.live-map .maplibregl-ctrl-attrib{filter:invert(1) grayscale(1)}
+  :root[data-ui-theme=dark] body.is-app .pw-map-note{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .mobile-nav{background:#151515;color:#bdbab2;border-color:var(--pw-edge);box-shadow:0 0 0 2px var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .mobile-nav .side-link,
+  :root[data-ui-theme=dark] body.is-app .mobile-nav .side-link.active{color:#bdbab2}
+  :root[data-ui-theme=dark] body.is-app .mobile-nav .side-link.active{color:var(--pw-amber)}
+  :root[data-ui-theme=dark] body.is-app .mobile-nav .mobile-capture{border-color:var(--pw-paper);box-shadow:0 0 0 2px var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-screen-header,
+  :root[data-ui-theme=dark] body.is-app .pw-profile .pw-screen-header{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-intro h1,
+  :root[data-ui-theme=dark] body.is-app .pw-profile h2,
+  :root[data-ui-theme=dark] body.is-app .pw-profile h3{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-summary{border-bottom-color:transparent}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-summary progress{display:block;width:100%;height:8px;order:0;appearance:none;border:0;border-radius:99px;background:#3a3a3e}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-summary progress::-webkit-progress-bar{background:#3a3a3e;border-radius:99px}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-summary progress::-webkit-progress-value{background:var(--pw-amber);border-radius:99px}
+  :root[data-ui-theme=dark] body.is-app .pw-collection-summary progress::-moz-progress-bar{background:var(--pw-amber);border-radius:99px}
+  :root[data-ui-theme=dark] body.is-app .pw-filters .chip{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-filters .chip.active{background:var(--pw-white);color:#151515;border-color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-entry{background:#242427;color:var(--pw-white);border-color:var(--pw-edge);box-shadow:3px 3px 0 #000}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-entry-art{background:#303035;border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-entry-copy strong{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-entry-copy small,
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-undiscovered small{color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-rarity{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-rarity[data-rarity=rare],
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-rarity[data-rarity="super rare"]{background:var(--pw-amber);color:#151515;border-color:#151515}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-undiscovered{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-journal .pw-undiscovered>span{border-color:var(--pw-edge);color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .pw-week{background:#151515;color:var(--pw-white);border:2px solid var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-identity-card,
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-settings-card{color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-progress-card{background:#151515;border:2px solid var(--pw-edge);box-shadow:3px 3px 0 #000}
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-privacy-row,
+  :root[data-ui-theme=dark] body.is-app .pw-profile .pw-edit-profile,
+  :root[data-ui-theme=dark] body.is-app .pw-profile .pw-data-controls{border-color:#3a3a3e}
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-details-card input,
+  :root[data-ui-theme=dark] body.is-app .pw-profile .profile-details-card select{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app #captureModal .pw-capture-screen{background:#151515;color:var(--pw-white)}
+  :root[data-ui-theme=dark] body.is-app #captureModal .pw-capture-safety span,
+  :root[data-ui-theme=dark] body.is-app #captureModal .pw-capture-privacy{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app #captureModal .pw-capture-help,
+  :root[data-ui-theme=dark] body.is-app #captureModal .pw-capture-privacy p{color:var(--pw-muted)!important}
+  :root[data-ui-theme=dark] body.is-app .care-hero,
+  :root[data-ui-theme=dark] body.is-app .data-card{background:#151515;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .care-option{background:#242427;color:var(--pw-white);border-color:var(--pw-edge)}
+  :root[data-ui-theme=dark] body.is-app .care-option small,
+  :root[data-ui-theme=dark] body.is-app .panel-intro p{color:var(--pw-muted)}
+  :root[data-ui-theme=dark] body.is-app .flag-row{background:#242427;color:var(--pw-white)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  body.is-app .pw-home-sheet,
+  body.is-app .pw-home-sheet *{transition:none!important}
+}
+
+/* Give the prototype header enough breathing room on narrow phones. */
+@media(max-width:380px){
+  body:has(.pw-home) .pw-home-header{gap:6px}
+  body:has(.pw-home) .pw-greeting{flex:1;min-width:0;gap:6px;padding:3px 8px 3px 3px}
+  body:has(.pw-home) .pw-avatar{width:38px;height:38px;border-radius:12px}
+  body:has(.pw-home) .pw-avatar svg{width:34px;height:34px}
+  body:has(.pw-home) .pw-greeting small{font-size:9px;line-height:1.05}
+  body:has(.pw-home) .pw-greeting strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:1.05}
+  body:has(.pw-home) .pw-streak-pill{flex:0 0 auto;max-width:88px;gap:3px;padding:6px 7px;font-size:9px!important;line-height:1.05;white-space:nowrap}
+  body:has(.pw-home) .pw-streak-pill .pw-icon{width:13px;height:16px}
+}
+
+/* The mobile web viewport is a straight-edged canvas; only the interactive
+   bottom sheet keeps its rounded top corners. */
+@media(max-width:900px){
+  body:has(.pw-home) .app-view,
+  body.is-app .app-view{border-radius:0!important}
+}
+
+/* Prototype parity: the reference uses a full-screen map with a peekable bottom sheet. */
+@media(max-width:900px){
+  body.is-app .pw-home{
+    position:relative;
+    display:block;
+    height:100%;
+    min-height:0;
+    padding:0!important;
+    overflow:hidden;
+    background:var(--pw-paper);
+  }
+  body.is-app .pw-home-header{
+    position:absolute;
+    top:14px;
+    left:12px;
+    right:12px;
+    z-index:20;
+    margin:0;
+    pointer-events:none;
+  }
+  body.is-app .pw-home-header>*{pointer-events:auto}
+  body.is-app .pw-map-filters{position:absolute;top:64px;left:12px;z-index:20}
+  body.is-app .pw-map-locate{position:absolute;top:108px;right:12px;z-index:20}
+  body.is-app .pw-home-grid{position:relative;display:block!important;width:100%;height:100%;min-height:0}
+  body.is-app .pw-home-canvas{position:relative;display:block;width:100%;height:100%;min-height:0}
+  body.is-app .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  body.is-app .pw-map-frame{position:absolute;inset:0;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+  body.is-app .pw-map-frame .app-map{height:100%!important;min-height:0;border:0;border-radius:0}
+  body.is-app .pw-map-frame .map-title{display:none!important}
+  body.is-app .pw-map-card .app-actions{display:none}
+  body.is-app .pw-map-note{bottom:calc(var(--pw-sheet-visible,250px) + 12px);left:12px;max-width:calc(100% - 24px);z-index:18}
+  body.is-app .pw-home-sheet{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:12;
+    display:block;
+    width:100%;
+    height:min(640px,calc(100% - 104px));
+    min-height:250px;
+    margin:0;
+    overflow:hidden;
+    transform:translateY(var(--pw-sheet-shift,390px));
+    background:var(--pw-paper);
+    border:2.5px solid var(--pw-edge);
+    border-bottom:0;
+    border-radius:28px 28px 0 0;
+    box-shadow:0 -2px 0 var(--pw-shadow);
+    transition:transform .35s cubic-bezier(.25,.9,.3,1);
+    touch-action:none;
+  }
+  body.is-app .pw-home-sheet.is-dragging{transition:none;cursor:grabbing}
+  body.is-app .pw-sheet-grab{display:flex;align-items:center;justify-content:center;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;cursor:grab}
+  body.is-app .pw-sheet-grab span{display:block;width:42px;height:5px;border-radius:99px;background:var(--pw-stone)}
+  body.is-app .pw-home-sheet-body{display:block;height:calc(100% - 34px);padding:0 14px 96px;overflow:hidden}
+  body.is-app .pw-home-sheet.is-full .pw-home-sheet-body{overflow-y:auto}
+  body.is-app .pw-home-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card,
+  body.is-app #dashboard .pw-home-sheet .pw-goal-card{display:flex;width:auto;height:138px;min-height:138px;margin:0;padding:12px;border-radius:22px;box-shadow:3px 3px 0 var(--pw-shadow)}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card{align-items:center;justify-content:center;gap:6px;background:var(--pw-ink);color:var(--pw-white)}
+  body.is-app .pw-home-sheet .pw-streak-card [data-streak-cat]{flex:0 1 64px}
+  body.is-app .pw-home-sheet .pw-streak-card .pw-cat{width:64px}
+  body.is-app .pw-home-sheet .pw-streak-card small{font-size:11px}
+  body.is-app .pw-home-sheet .pw-streak-card #streakMetric{font-size:34px}
+  body.is-app .pw-home-sheet .pw-goal-card{justify-content:center;gap:7px;background:var(--pw-surface)}
+  body.is-app .pw-home-sheet .pw-goal-card h2{font-size:16px}
+  body.is-app .pw-home-sheet .pw-goal-card p{font-size:13px}
+  body.is-app .pw-home-sheet .pw-goal-card .progress-track{height:10px}
+  body.is-app .pw-home-sheet .pw-goal-card #dailyGoalMetric{font-size:13px}
+  body.is-app .pw-home-sheet .pw-recent{display:block;height:auto;margin-top:14px}
+  body.is-app .pw-home-sheet .pw-recent .pw-section-heading{margin:0 0 6px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry{min-height:68px;padding:8px 0;border:0;box-shadow:none;background:transparent}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-art{width:48px;height:48px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy strong{font-size:15px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy small{font-size:11px}
+  body.is-app .pw-home-sheet .pw-recent .pw-rarity{font-size:10px;padding:4px 7px}
+}
+@media(max-width:380px){
+  body.is-app .pw-home-stat-grid{gap:8px}
+  body.is-app .pw-home-sheet-body{padding-left:10px;padding-right:10px}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card,
+  body.is-app #dashboard .pw-home-sheet .pw-goal-card{padding:10px}
+}
+
 /* Landing-page store marks: the two sketch icons gently meet, bump, and rebound. */
 .store-sketch-pair{position:relative;width:124px;height:58px;display:block;flex:0 0 124px;gap:0}
 .store-sketch-pair .store-sketch{position:absolute;top:0;left:0;margin:0;transform:rotate(-6deg);animation:pawprint-store-left 3.4s cubic-bezier(.45,0,.25,1) infinite;will-change:transform}
@@ -143,3 +374,397 @@ body.is-app #dashboard .pw-streak-card,body.is-app #dashboard .pw-goal-card{min-
 .pw-admin-head h3,.pw-admin-card>h3{margin:24px 0 10px}.pw-admin-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:20px}.pw-admin-stats span{display:grid;gap:2px;padding:12px;border-radius:16px;background:var(--pw-ink,#151515);color:var(--pw-paper,#faf8f4)}.pw-admin-stats b{font-size:1.35rem}.pw-admin-stats small{color:var(--pw-stone,#8c8a84)}.pw-admin-list{display:grid;gap:10px;margin-top:12px}.pw-admin-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:2px solid var(--pw-line,#e4e1da);border-radius:18px;background:var(--pw-white,#fff)}.pw-admin-item strong,.pw-admin-item small,.pw-admin-item time{display:block}.pw-admin-item small,.pw-admin-item time{margin-top:3px;color:var(--pw-stone,#8c8a84);font-size:.78rem}.pw-admin-actions{display:flex;flex-wrap:wrap;gap:7px}.pw-admin-empty{display:grid;gap:5px;padding:36px 18px;border:2px dashed var(--pw-line,#e4e1da);border-radius:18px;text-align:center}.pw-admin-empty span{color:var(--pw-stone,#8c8a84)}
 @media(max-width:600px){.pw-admin-backdrop{padding:12px}.pw-admin-card{padding:18px;border-radius:22px;box-shadow:5px 5px 0 var(--pw-ink,#151515)}.pw-admin-item{align-items:flex-start;flex-direction:column}.pw-admin-actions{width:100%}.pw-admin-actions .btn{flex:1}}
 @media(max-width:600px){.app-header-actions [data-open-admin]{width:36px;min-width:36px;padding:0;font-size:0}.app-header-actions [data-open-admin]:after{content:'⋮';font-size:1.1rem;font-weight:900}}
+
+/* Consistent dark surfaces, explicit locked medals, and reliable empty states. */
+:root[data-ui-theme=dark] #dashboard .app-card:not(.metric-card),
+:root[data-ui-theme=dark] #dashboard .care-option,
+:root[data-ui-theme=dark] #dashboard .profile-card:not(.dark),
+:root[data-ui-theme=dark] #dashboard .more-card:not(.dark),
+:root[data-ui-theme=dark] #dashboard .data-card{background:var(--pw-surface);color:var(--pw-text);border-color:var(--pw-line)}
+:root[data-ui-theme=dark] #dashboard .care-option strong,
+:root[data-ui-theme=dark] #dashboard .data-card h3,
+:root[data-ui-theme=dark] #dashboard .more-card h2,
+:root[data-ui-theme=dark] #dashboard .more-card h3,
+:root[data-ui-theme=dark] #dashboard .profile-card:not(.dark) h2{color:var(--pw-text)!important}
+:root[data-ui-theme=dark] #dashboard .care-option small,
+:root[data-ui-theme=dark] #dashboard .data-card .panel-intro p,
+:root[data-ui-theme=dark] #dashboard .flag-row small,
+:root[data-ui-theme=dark] #dashboard .empty-state,
+:root[data-ui-theme=dark] #dashboard .more-card:not(.dark) p{color:var(--pw-muted)}
+:root[data-ui-theme=dark] #dashboard .flag-row{background:var(--pw-paper);color:var(--pw-text)}
+:root[data-ui-theme=dark] #dashboard .data-card .entry-badge{background:var(--pw-amber);color:var(--pw-ink);border-color:var(--pw-ink)}
+:root[data-ui-theme=dark] #dashboard .data-card .empty-state{border-color:var(--pw-stone);color:var(--pw-muted)}
+
+#dashboard .empty-state{display:grid;place-items:center;gap:8px;line-height:1.45}
+#dashboard .empty-state strong{display:block;color:var(--pw-text)}
+#dashboard .empty-state span{display:block}
+#dashboard .empty-state .btn{margin-top:4px}
+.pw-undiscovered{line-height:1.4}
+.pw-empty-action>div{display:grid;gap:4px}
+.pw-empty-action .btn{justify-self:start;margin-top:7px}
+.pw-loading{min-height:72px;padding:16px 4px;display:flex;gap:12px;align-items:center;font-size:13px}
+.pw-loading-copy{color:var(--pw-muted);font-weight:800}
+.profile-medal-lock{display:inline-flex;align-items:center;justify-content:center;min-height:18px;padding:2px 6px;border:1px solid var(--pw-muted);border-radius:99px;color:var(--pw-muted);font-size:9px;font-weight:900;line-height:1}
+#dashboard .profile-medal-item.locked{position:relative;opacity:.72}
+#dashboard .profile-medal-item.locked .profile-medal-art{filter:grayscale(1);opacity:.62}
+#dashboard .profile-medal-item.locked .profile-medal-lock{margin-top:2px}
+
+.pw-screen a:focus-visible,.pw-capture-screen a:focus-visible,#dashboard a:focus-visible,#dashboard button:focus-visible{outline:3px solid var(--pw-amber);outline-offset:4px}
+@media(prefers-reduced-motion:reduce){
+  .pw-screen *, .pw-capture-screen *, #dashboard *, .mobile-nav *{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
+  .care-mark{animation:none!important}
+}
+@media(max-width:380px){
+  #dashboard .pw-home-grid{grid-template-columns:1fr;gap:12px}
+  #dashboard .pw-streak-card,#dashboard .pw-goal-card{grid-column:1/-1;min-height:132px}
+  .pw-home-header{align-items:flex-start}
+  .pw-streak-pill{max-width:132px;white-space:normal;text-align:center}
+  .pw-entry{padding:10px;gap:8px}
+  .pw-entry-copy strong{font-size:15px}
+  .pw-rarity{font-size:9px;padding:3px 5px}
+  body.is-app .mobile-nav{left:8px;right:8px;padding-left:5px;padding-right:5px}
+  body.is-app .mobile-nav .side-link{font-size:10px}
+  body.is-app .mobile-nav .mobile-capture{margin-left:3px;margin-right:3px;flex-basis:56px;width:56px;height:56px}
+}
+
+/* Prototype layout alignment: keep the real API-backed screens, but match the
+   supplied Pawprint mobile reference for shell width, hierarchy, spacing, and
+   thumb-zone navigation. */
+@media(max-width:600px){
+  body.is-app{background:var(--pw-paper);overflow-x:hidden}
+  body.is-app .app-view{padding:12px 0 calc(108px + env(safe-area-inset-bottom))!important}
+  body.is-app .app-view>.shell{width:min(100%,420px)!important;padding:0 12px!important}
+  body.is-app #dashboard .pw-screen{padding-bottom:12px}
+  body.is-app .pw-home-header{min-height:54px;margin-bottom:14px}
+  body.is-app .pw-home-grid{grid-template-columns:1fr 1fr;gap:12px}
+  body.is-app .pw-map-frame{border-radius:24px;box-shadow:3px 4px 0 var(--pw-ink)}
+  body.is-app .pw-map-frame .app-map{height:clamp(265px,76vw,330px)}
+  body.is-app .pw-spot-button{min-height:54px;border-radius:17px;font-size:18px}
+  body.is-app #dashboard .pw-streak-card,
+  body.is-app #dashboard .pw-goal-card{min-height:138px;padding:13px;border-radius:22px}
+  body.is-app .pw-streak-card #streakMetric{font-size:34px}
+  body.is-app .pw-streak-card .pw-cat{width:62px}
+  body.is-app .pw-section-heading{margin-top:4px}
+  body.is-app .pw-section-heading h2{font-size:19px!important}
+  body.is-app .pw-entry{min-height:76px;padding:11px;border-radius:19px;box-shadow:2px 3px 0 var(--pw-ink)}
+  body.is-app .pw-entry-art{width:48px;height:48px;border-radius:15px}
+  body.is-app .pw-screen-header{margin-bottom:18px}
+  body.is-app .pw-screen-header h2{font-size:21px!important}
+  body.is-app .pw-collection-intro h1{font-size:28px}
+  body.is-app .pw-filters{margin:14px 0;gap:7px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
+  body.is-app .pw-filters .chip{min-height:36px;white-space:nowrap}
+  body.is-app .pw-entries{gap:11px}
+  body.is-app .pw-week{margin:20px 0 8px;padding:16px;border-radius:22px}
+  body.is-app .pw-profile .profile-identity-card{padding-top:4px;padding-bottom:18px}
+  body.is-app .pw-profile .profile-avatar{width:104px;height:104px;border-radius:29px}
+  body.is-app .pw-profile .profile-identity-card h2{font-size:26px}
+  body.is-app .pw-profile .profile-progress-card{border-radius:22px;padding:17px}
+  body.is-app .pw-profile .profile-achievement-head h3{font-size:21px}
+  body.is-app .pw-profile .profile-medal-grid{gap:6px}
+  body.is-app .mobile-nav{left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));height:66px;padding:7px 6px;border-radius:24px;box-shadow:0 3px 0 var(--pw-ink)}
+  body.is-app .mobile-nav .side-link{font-size:10.5px}
+  body.is-app .mobile-nav .mobile-capture{width:58px;height:58px;flex-basis:58px;margin-top:-29px}
+}
+
+/* Final reference override. Keep this last so older mobile rules cannot turn
+   the prototype map-first screen back into the legacy card-first layout. */
+@media(max-width:900px){
+  body.is-app .pw-home{position:relative;display:block;height:100%;min-height:0;padding:0!important;overflow:hidden;background:var(--pw-paper)}
+  body.is-app .pw-home-header{position:absolute;top:14px;left:12px;right:12px;z-index:30;margin:0;pointer-events:none}
+  body.is-app .pw-home-header>*{pointer-events:auto}
+  body.is-app .pw-map-filters{position:absolute;top:64px;left:12px;z-index:30}
+  body.is-app .pw-map-locate{position:absolute;top:108px;right:12px;z-index:30}
+  body.is-app .pw-home-grid{position:relative;display:block!important;width:100%;height:100%;min-height:0}
+  body.is-app .pw-home-canvas{position:relative;display:block;width:100%;height:100%;min-height:0}
+  body.is-app .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  body.is-app .pw-map-frame{position:absolute;inset:0;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+  body.is-app .pw-map-frame .app-map{height:100%!important;min-height:0;border:0;border-radius:0}
+  body.is-app .pw-map-frame .map-title{display:none!important}
+  body.is-app .pw-map-card .app-actions{display:none!important}
+  body.is-app .pw-map-note{bottom:calc(var(--pw-sheet-visible,250px) + 12px);left:12px;z-index:18}
+  body.is-app .pw-home-sheet{position:absolute;left:0;right:0;bottom:0;z-index:24;display:block;width:100%;height:min(640px,calc(100% - 104px));min-height:250px;margin:0;overflow:hidden;transform:translateY(var(--pw-sheet-shift,390px));background:var(--pw-paper);border:2.5px solid var(--pw-edge);border-bottom:0;border-radius:28px 28px 0 0;box-shadow:0 -2px 0 var(--pw-shadow);transition:transform .35s cubic-bezier(.25,.9,.3,1);touch-action:none}
+  body.is-app .pw-home-sheet.is-dragging{transition:none;cursor:grabbing}
+  body.is-app .pw-sheet-grab{display:flex;align-items:center;justify-content:center;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;cursor:grab}
+  body.is-app .pw-sheet-grab span{display:block;width:42px;height:5px;border-radius:99px;background:var(--pw-stone)}
+  body.is-app .pw-home-sheet-body{display:block;height:calc(100% - 34px);padding:0 14px 96px;overflow:hidden}
+  body.is-app .pw-home-sheet.is-full .pw-home-sheet-body{overflow-y:auto}
+  body.is-app .pw-home-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card,body.is-app #dashboard .pw-home-sheet .pw-goal-card{position:static;display:flex;width:auto;height:138px;min-height:138px;margin:0;padding:12px;border-radius:22px;box-shadow:3px 3px 0 var(--pw-shadow)}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card{align-items:center;justify-content:center;gap:6px;background:var(--pw-ink);color:var(--pw-white)}
+  body.is-app .pw-home-sheet .pw-streak-card [data-streak-cat]{flex:0 1 64px}
+  body.is-app .pw-home-sheet .pw-streak-card .pw-cat{width:64px}
+  body.is-app .pw-home-sheet .pw-streak-card small{font-size:11px}
+  body.is-app .pw-home-sheet .pw-streak-card #streakMetric{font-size:34px}
+  body.is-app .pw-home-sheet .pw-goal-card{justify-content:center;gap:7px;background:var(--pw-surface)}
+  body.is-app .pw-home-sheet .pw-goal-card h2{font-size:16px}
+  body.is-app .pw-home-sheet .pw-goal-card p{font-size:13px}
+  body.is-app .pw-home-sheet .pw-goal-card .progress-track{height:10px}
+  body.is-app .pw-home-sheet .pw-recent{display:block;height:auto;margin-top:14px}
+  body.is-app .pw-home-sheet .pw-recent .pw-section-heading{margin:0 0 6px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry{min-height:68px;padding:8px 0;border:0;box-shadow:none;background:transparent}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-art{width:48px;height:48px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy strong{font-size:15px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy small{font-size:11px}
+}
+
+/* The authenticated localhost route can mount the app before adding the
+   legacy body.is-app class. Scope to the real screen as a fallback. */
+@media(max-width:900px){
+  body:has(.pw-home) .app-view{position:relative;width:min(100%,400px);height:min(calc(100dvh - 24px),860px);min-height:0;margin:12px auto;padding:0!important;overflow:hidden;border:2.5px solid var(--pw-edge);border-radius:34px;box-shadow:6px 6px 0 var(--pw-shadow);background:var(--pw-paper)}
+  body:has(.pw-home) .app-view>.shell{width:100%;height:100%;max-width:none;margin:0;padding:0!important}
+  body:has(.pw-home) .app-shell{display:block!important;height:100%;padding:0!important;gap:0!important}
+  body:has(.pw-home) .app-sidebar,body:has(.pw-home) .app-header{display:none!important}
+  body:has(.pw-home) .app-main{height:100%;padding:0!important;min-width:0}
+  body:has(.pw-home) .mobile-nav{position:absolute;left:12px;right:12px;bottom:12px;z-index:40;display:flex!important;width:auto;max-width:none;margin:0;padding:7px 6px;height:66px;box-sizing:border-box;background:var(--pw-ink);border:0;border-radius:24px;box-shadow:0 0 0 2px var(--pw-edge);align-items:center;justify-content:space-between}
+  body:has(.pw-home) .pw-screen{width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-home{position:relative;display:block;height:100%;min-height:0;padding:0!important;overflow:hidden;background:var(--pw-paper)}
+  body:has(.pw-home) .pw-home-header{position:absolute;top:14px;left:12px;right:12px;z-index:30;margin:0;pointer-events:none}
+  body:has(.pw-home) .pw-home-header>*{pointer-events:auto}
+  body:has(.pw-home) .pw-map-filters{position:absolute;top:64px;left:12px;z-index:30}
+  body:has(.pw-home) .pw-map-locate{position:absolute;top:108px;right:12px;z-index:30}
+  body:has(.pw-home) .pw-home-grid{position:relative;display:block!important;width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-home-canvas{position:relative;display:block;width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  body:has(.pw-home) .pw-map-frame{position:absolute;inset:0;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+  body:has(.pw-home) .pw-map-frame .app-map{height:100%!important;min-height:0;border:0;border-radius:0}
+  body:has(.pw-home) .pw-map-frame .map-title,body:has(.pw-home) .pw-map-card .app-actions{display:none!important}
+  body:has(.pw-home) .pw-map-note{bottom:calc(var(--pw-sheet-visible,250px) + 12px);left:12px;z-index:18}
+  body:has(.pw-home) .pw-home-sheet{position:absolute;left:0;right:0;bottom:0;z-index:24;display:block;width:100%;height:min(640px,calc(100% - 104px));min-height:250px;margin:0;overflow:hidden;transform:translateY(var(--pw-sheet-shift,390px));background:var(--pw-paper);border:2.5px solid var(--pw-edge);border-bottom:0;border-radius:28px 28px 0 0;box-shadow:0 -2px 0 var(--pw-shadow);transition:transform .35s cubic-bezier(.25,.9,.3,1);touch-action:none}
+  body:has(.pw-home) .pw-home-sheet.is-dragging{transition:none;cursor:grabbing}
+  body:has(.pw-home) .pw-sheet-grab{display:flex;align-items:center;justify-content:center;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;cursor:grab}
+  body:has(.pw-home) .pw-sheet-grab span{display:block;width:42px;height:5px;border-radius:99px;background:var(--pw-stone)}
+  body:has(.pw-home) .pw-home-sheet-body{display:block;height:calc(100% - 34px);padding:0 14px 96px;overflow:hidden}
+  body:has(.pw-home) .pw-home-sheet.is-full .pw-home-sheet-body{overflow-y:auto}
+  body:has(.pw-home) .pw-home-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body:has(.pw-home) #dashboard .pw-home-sheet .pw-streak-card,body:has(.pw-home) #dashboard .pw-home-sheet .pw-goal-card{position:static;display:flex;width:auto;height:138px;min-height:138px;margin:0;padding:12px;border-radius:22px;box-shadow:3px 3px 0 var(--pw-shadow)}
+  body:has(.pw-home) #dashboard .pw-home-sheet .pw-streak-card{align-items:center;justify-content:center;gap:6px;background:var(--pw-ink);color:var(--pw-white)}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card [data-streak-cat]{flex:0 1 64px}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card .pw-cat{width:64px}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card #streakMetric{font-size:34px}
+  body:has(.pw-home) .pw-home-sheet .pw-goal-card{justify-content:center;gap:7px;background:var(--pw-surface)}
+  body:has(.pw-home) .pw-home-sheet .pw-recent{display:block;height:auto;margin-top:14px}
+  body:has(.pw-home) .pw-home-sheet .pw-recent .pw-entry{min-height:68px;padding:8px 0;border:0;box-shadow:none;background:transparent}
+}
+
+/* The reference home screen uses a dark map canvas too. MapLibre may omit
+   the live-map class while its style is loading, so cover both states. */
+@media(max-width:900px){
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map .maplibregl-canvas{filter:grayscale(1) brightness(.34) contrast(1.12)}
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map .maplibregl-ctrl-group,
+  :root[data-ui-theme=dark] body.is-app .pw-map-frame .app-map .maplibregl-ctrl-attrib{filter:invert(1) grayscale(1)}
+}
+
+/* Keep the black coat black in dark mode; only the surrounding shell changes
+   contrast for the reference layout. */
+:root[data-ui-theme=dark] .pw-streak-card .is-black .pw-cat-fur,
+:root[data-ui-theme=dark] .pw-week .is-black .pw-cat-fur,
+:root[data-ui-theme=dark] .streak-cat-badge.is-broken .pw-cat-fur{fill:#151515!important;stroke:#8c8a84!important}
+:root[data-ui-theme=dark] .pw-streak-card .is-black .pw-cat-tail,
+:root[data-ui-theme=dark] .pw-week .is-black .pw-cat-tail,
+:root[data-ui-theme=dark] .streak-cat-badge.is-broken .pw-cat-tail{stroke:#8c8a84!important}
+
+/* Final narrow-header spacing override. */
+@media(max-width:380px){
+  body:has(.pw-home) .pw-home-header{gap:6px}
+  body:has(.pw-home) .pw-greeting{flex:1;min-width:0;gap:6px;padding:3px 8px 3px 3px}
+  body:has(.pw-home) .pw-avatar{width:38px;height:38px;border-radius:12px}
+  body:has(.pw-home) .pw-avatar svg{width:34px;height:34px}
+  body:has(.pw-home) .pw-greeting small{font-size:9px;line-height:1.05}
+  body:has(.pw-home) .pw-greeting strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:1.05}
+  body:has(.pw-home) .pw-streak-pill{flex:0 0 auto;max-width:88px;gap:3px;padding:6px 7px;font-size:9px!important;line-height:1.05;white-space:nowrap}
+  body:has(.pw-home) .pw-streak-pill .pw-icon{width:13px;height:16px}
+}
+
+/* Final outer-shell edge treatment: square viewport, rounded bottom sheet only. */
+@media(max-width:900px){
+  body:has(.pw-home) .app-view,
+  body.is-app .app-view{border-radius:0!important}
+}
+
+@media(min-width:601px) and (max-width:900px){
+  body.is-app .app-view>.shell{width:min(100%,520px)}
+}
+
+/* Mobile Home follows the supplied prototype: map-first canvas with a
+   thumb-zone bottom sheet. The controls and cards remain the live app nodes. */
+@media(max-width:600px){
+  body.is-app .pw-home{position:relative;min-height:calc(100dvh - 120px);height:calc(100dvh - 120px);overflow:hidden}
+  body.is-app .pw-home-header{position:absolute;top:10px;left:12px;right:12px;z-index:8;margin:0;pointer-events:none}
+  body.is-app .pw-home-header>*{pointer-events:auto}
+  body.is-app .pw-greeting{padding:4px 12px 4px 4px;border:1.5px solid var(--pw-ink);border-radius:999px;background:var(--pw-surface);box-shadow:2px 2px 0 var(--pw-ink)}
+  body.is-app .pw-streak-pill{background:var(--pw-surface);box-shadow:2px 2px 0 var(--pw-ink)}
+  body.is-app .pw-map-filters{position:absolute;top:63px;left:12px;z-index:8;display:flex;gap:6px;align-items:center}
+  body.is-app .pw-map-filter{display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:5px 10px;border:1.5px solid var(--pw-ink);border-radius:999px;background:var(--pw-surface);color:var(--pw-text);font:inherit;font-size:10px;font-weight:900;white-space:nowrap;box-shadow:1px 1px 0 var(--pw-ink)}
+  body.is-app .pw-map-filter.is-active{background:var(--pw-ink);color:var(--pw-paper)}
+  body.is-app .pw-map-filter .pw-icon{width:12px;height:12px}
+  body.is-app .pw-map-care-filter b{font-size:10px;color:var(--pw-amber)}
+  body.is-app .pw-map-locate{position:absolute;top:108px;right:12px;z-index:8;width:40px;height:40px;border:2px solid var(--pw-ink);border-radius:13px;background:var(--pw-surface);color:var(--pw-text);font:700 22px/1 'Pawprint Rounded',sans-serif;box-shadow:2px 2px 0 var(--pw-ink)}
+  body.is-app .pw-map-locate:disabled{opacity:1}
+  body.is-app .pw-map-frame .maplibregl-popup{z-index:20}
+  body.is-app .pw-map-frame .maplibregl-ctrl-top-right{top:155px}
+  body.is-app .pw-home-grid{position:relative;display:block!important;height:100%;min-height:0}
+  body.is-app .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important;grid-column:auto!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  body.is-app .pw-map-frame{position:absolute;inset:-12px;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+  body.is-app .pw-map-frame .app-map{height:100%!important;min-height:0;border-radius:0}
+  body.is-app .pw-map-frame .map-title{display:none}
+  body.is-app .pw-map-card .app-actions{display:none}
+  body.is-app .pw-map-note{bottom:264px;z-index:7;left:24px}
+  body.is-app .pw-home-grid:before{content:"";position:absolute;left:-12px;right:-12px;bottom:-12px;height:254px;z-index:4;border:2px solid var(--pw-ink);border-bottom:0;border-radius:27px 27px 0 0;background:var(--pw-paper);box-shadow:0 -2px 0 var(--pw-ink);pointer-events:none}
+  body.is-app #dashboard .pw-streak-card,body.is-app #dashboard .pw-goal-card{position:absolute;top:calc(100% - 230px);z-index:5;width:calc(50% - 8px);height:96px;min-height:96px;padding:11px;border-radius:20px;box-shadow:2px 3px 0 var(--pw-ink)}
+  body.is-app #dashboard .pw-streak-card{left:0;display:flex;justify-content:center;gap:6px}
+  body.is-app #dashboard .pw-goal-card{right:0}
+  body.is-app .pw-streak-card [data-streak-cat]{flex-basis:49px}
+  body.is-app .pw-streak-card .pw-cat{width:49px}
+  body.is-app .pw-streak-card small{font-size:10px}
+  body.is-app .pw-streak-card #streakMetric{font-size:29px}
+  body.is-app .pw-goal-card h2{font-size:15px}
+  body.is-app .pw-goal-card p{font-size:11px}
+  body.is-app .pw-goal-card .progress-track{height:8px}
+  body.is-app .pw-goal-card #dailyGoalMetric{font-size:11px}
+  body.is-app .pw-recent{position:absolute;left:12px;right:12px;top:calc(100% - 126px);z-index:5;height:112px;overflow:hidden}
+  body.is-app .pw-recent .pw-section-heading{margin:0 0 4px}
+  body.is-app .pw-recent .pw-section-heading h2{font-size:16px!important}
+  body.is-app .pw-recent .pw-entry{min-height:58px;padding:6px 0;border:0;box-shadow:none;background:transparent}
+  body.is-app .pw-recent .pw-entry-art{width:42px;height:42px}
+  body.is-app .pw-recent .pw-entry-copy strong{font-size:13px}
+  body.is-app .pw-recent .pw-entry-copy small{font-size:10px}
+  body.is-app .pw-recent .pw-rarity{font-size:9px;padding:3px 6px}
+  body.is-app .mobile-nav{z-index:30}
+}
+
+/* Match the supplied standalone prototype's actual Home structure. The live
+   map, dashboard IDs, and API-backed cards stay intact inside this shell. */
+body.is-app .pw-home-canvas{display:contents}
+body.is-app .pw-home-sheet,body.is-app .pw-home-sheet-body,body.is-app .pw-home-stat-grid{display:contents}
+.pw-sheet-grab{display:none}
+
+@media(max-width:600px){
+  body.is-app .pw-home{display:block;position:relative;min-height:calc(100dvh - 120px);height:calc(100dvh - 120px);overflow:hidden}
+  body.is-app .pw-home-grid{position:relative;display:block!important;height:100%;min-height:0}
+  body.is-app .pw-home-canvas{display:block;position:relative;width:100%;height:100%;min-height:0}
+  body.is-app .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important}
+  body.is-app .pw-home-sheet{position:absolute;left:-12px;right:-12px;bottom:-12px;z-index:12;display:block;height:270px;min-height:270px;overflow:hidden;transform:translateY(var(--pw-sheet-shift,0px));background:var(--pw-paper);border:2px solid var(--pw-ink);border-bottom:0;border-radius:28px 28px 0 0;box-shadow:0 -2px 0 var(--pw-ink);transition:transform .32s cubic-bezier(.2,.75,.2,1);touch-action:none}
+  body.is-app .pw-home-sheet.is-dragging{transition:none;cursor:grabbing}
+  body.is-app .pw-sheet-grab{display:flex;align-items:center;justify-content:center;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;color:var(--pw-stone);cursor:grab}
+  body.is-app .pw-sheet-grab span{display:block;width:44px;height:5px;border-radius:99px;background:var(--pw-stone)}
+  body.is-app .pw-home-sheet-body{display:block;height:calc(100% - 34px);padding:0 12px 80px;overflow:hidden}
+  body.is-app .pw-home-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card,
+  body.is-app #dashboard .pw-home-sheet .pw-goal-card{position:static;display:flex;width:auto;height:96px;min-height:96px;margin:0;padding:11px;border-radius:20px;box-shadow:2px 3px 0 var(--pw-ink)}
+  body.is-app #dashboard .pw-home-sheet .pw-streak-card{justify-content:center;gap:6px}
+  body.is-app .pw-home-sheet .pw-streak-card [data-streak-cat]{flex:0 1 49px}
+  body.is-app .pw-home-sheet .pw-streak-card .pw-cat{width:49px}
+  body.is-app .pw-home-sheet .pw-streak-card small{font-size:10px}
+  body.is-app .pw-home-sheet .pw-streak-card #streakMetric{font-size:29px}
+  body.is-app .pw-home-sheet .pw-goal-card{justify-content:center;gap:5px}
+  body.is-app .pw-home-sheet .pw-goal-card h2{font-size:15px}
+  body.is-app .pw-home-sheet .pw-goal-card p{font-size:11px}
+  body.is-app .pw-home-sheet .pw-goal-card .progress-track{height:8px}
+  body.is-app .pw-home-sheet .pw-goal-card #dailyGoalMetric{font-size:11px}
+  body.is-app .pw-home-sheet .pw-recent{display:block;position:static;height:112px;margin-top:9px;overflow:hidden}
+  body.is-app .pw-home-sheet .pw-recent .pw-section-heading{margin:0 0 4px}
+  body.is-app .pw-home-sheet .pw-recent .pw-section-heading h2{font-size:16px!important}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry{min-height:58px;padding:6px 0;border:0;box-shadow:none;background:transparent}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-art{width:42px;height:42px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy strong{font-size:13px}
+  body.is-app .pw-home-sheet .pw-recent .pw-entry-copy small{font-size:10px}
+  body.is-app .pw-home-sheet .pw-recent .pw-rarity{font-size:9px;padding:3px 6px}
+  body.is-app .pw-home-grid:before{display:none}
+  body.is-app .pw-map-note{z-index:7}
+}
+
+@media(max-width:380px){
+  body.is-app .pw-home-stat-grid{gap:8px}
+  body.is-app .pw-home-sheet{height:266px;min-height:266px}
+  body.is-app .pw-home-sheet-body{padding-left:10px;padding-right:10px}
+  body.is-app .pw-home-sheet .pw-streak-card,
+  body.is-app .pw-home-sheet .pw-goal-card{padding:9px}
+}
+
+@media(prefers-reduced-motion:reduce){body.is-app .pw-home-sheet{transition:none}}
+
+/* Prototype dark-mode tokens keep the ink cat black while switching the
+   shell/card edge to the warm paper edge used by the supplied HTML. */
+:root{--pw-edge:var(--pw-ink);--pw-shadow:var(--pw-ink)}
+:root[data-ui-theme=dark]{--pw-paper:#18181a;--pw-surface:#242427;--pw-text:#faf8f4;--pw-muted:#a9a7a0;--pw-line:#3a3a3e;--pw-edge:#f2efe8;--pw-shadow:#000}
+
+/* The standalone reference uses a centered, clipped phone shell. Apply that
+   same geometry to the real authenticated mobile app instead of rendering it
+   as a regular document page. */
+@media(max-width:600px){
+  html:has(body.is-app),body.is-app{background:var(--pw-line);overflow:hidden}
+  body.is-app .app-view{position:relative;width:min(100%,400px);height:min(calc(100dvh - 24px),860px);min-height:0;margin:12px auto;padding:0!important;overflow:hidden;border:2.5px solid var(--pw-edge);border-radius:34px;box-shadow:6px 6px 0 var(--pw-shadow);background:var(--pw-paper)}
+  body.is-app .app-view>.shell{width:100%;height:100%;max-width:none;margin:0;padding:0!important}
+  body.is-app .app-shell{display:block!important;width:100%;height:100%;padding:0!important}
+  body.is-app .app-main{position:relative;width:100%;height:100%;min-width:0;padding:0!important}
+  body.is-app #dashboard{width:100%;height:100%;min-height:0;padding:0!important}
+  body.is-app #dashboard>.pw-screen{height:100%;min-height:0}
+  body.is-app .pw-home{height:100%;min-height:0}
+  body.is-app .pw-journal,body.is-app .pw-profile,body.is-app #dashboard>.screen-panel:not(.pw-home):not(.pw-journal):not(.pw-profile){height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 98px}
+  body.is-app .pw-journal .pw-screen-header,body.is-app .pw-profile .pw-screen-header{margin-bottom:22px}
+  body.is-app .mobile-nav{position:absolute;left:12px;right:12px;bottom:12px;width:auto;max-width:none;margin:0}
+  body.is-app #captureModal .pw-capture-screen{min-height:100dvh}
+}
+
+/* Journal follows the reference's two-column collectible cards. */
+@media(max-width:600px){
+  body.is-app .pw-journal .pw-entries{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  body.is-app .pw-journal .pw-entry{display:block;min-height:0;padding:8px;border:2px solid var(--pw-edge);border-radius:18px;box-shadow:3px 3px 0 var(--pw-shadow);background:var(--pw-surface);color:var(--pw-text)}
+  body.is-app .pw-journal .pw-entry-art{width:100%;height:auto;aspect-ratio:1;border-radius:14px}
+  body.is-app .pw-journal .pw-entry-copy{display:block;margin-top:7px}
+  body.is-app .pw-journal .pw-entry-copy strong{display:block;font-size:14px;line-height:1.15}
+  body.is-app .pw-journal .pw-entry-copy small{font-size:11px;line-height:1.25}
+  body.is-app .pw-journal .pw-rarity{display:inline-flex;margin-top:7px;font-size:10px}
+  body.is-app .pw-journal .pw-first-found{display:inline-block;margin:5px 0 0;font-size:9px}
+  body.is-app .pw-journal .pw-missing-coat{grid-column:1/-1}
+  body.is-app .pw-journal .pw-undiscovered{grid-column:1/-1}
+}
+
+@media(max-width:600px){
+  body.is-app .pw-icon-button,body.is-app .pw-map-filter,body.is-app .pw-map-locate,body.is-app .pw-greeting,body.is-app .pw-streak-pill{border-color:var(--pw-edge);box-shadow:2px 2px 0 var(--pw-shadow)}
+  body.is-app .pw-home-sheet{border-color:var(--pw-edge);box-shadow:0 -2px 0 var(--pw-edge)}
+  body.is-app .pw-home-sheet .pw-streak-card,body.is-app .pw-home-sheet .pw-goal-card{border-color:var(--pw-edge);box-shadow:2px 3px 0 var(--pw-shadow)}
+  body.is-app .pw-spot-button{border-color:var(--pw-edge);box-shadow:2px 4px 0 var(--pw-shadow)}
+  body.is-app .mobile-nav{box-shadow:0 0 0 2px var(--pw-edge)}
+  body.is-app .mobile-nav .mobile-capture{border-color:var(--pw-paper);box-shadow:0 0 0 2px var(--pw-edge)}
+  body.is-app .pw-journal .pw-filters{position:relative;z-index:2;display:flex;min-height:38px;height:38px;align-items:center;overflow-x:auto;overflow-y:visible;flex-wrap:nowrap;padding:0 2px 2px;margin:14px 0}
+  body.is-app .pw-journal .pw-filters .chip{flex:0 0 auto;display:inline-flex;min-height:34px;line-height:1}
+}
+
+/* Late unscoped fallback for the actual mounted localhost app screen. */
+@media(max-width:900px){
+  body:has(.pw-home) .app-view{position:relative;width:min(100%,400px);height:min(calc(100dvh - 24px),860px);min-height:0;margin:12px auto;padding:0!important;overflow:hidden;border:2.5px solid var(--pw-edge);border-radius:34px;box-shadow:6px 6px 0 var(--pw-shadow);background:var(--pw-paper)}
+  body:has(.pw-home) .app-view>.shell{width:100%;height:100%;max-width:none;margin:0;padding:0!important}
+  body:has(.pw-home) .app-shell{display:block!important;height:100%;padding:0!important;gap:0!important}
+  body:has(.pw-home) .app-sidebar,body:has(.pw-home) .app-header{display:none!important}
+  body:has(.pw-home) .app-main{height:100%;padding:0!important;min-width:0}
+  body:has(.pw-home) .mobile-nav{position:absolute;left:12px;right:12px;bottom:12px;z-index:40;display:flex!important;width:auto;max-width:none;margin:0;padding:7px 6px;height:66px;box-sizing:border-box;background:var(--pw-ink);border:0;border-radius:24px;box-shadow:0 0 0 2px var(--pw-edge);align-items:center;justify-content:space-between}
+  body:has(.pw-home) .pw-screen{width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-home{position:relative;display:block;height:100%;min-height:0;padding:0!important;overflow:hidden;background:var(--pw-paper)}
+  body:has(.pw-home) .pw-home-header{position:absolute;top:14px;left:12px;right:12px;z-index:30;margin:0;pointer-events:none}
+  body:has(.pw-home) .pw-home-header>*{pointer-events:auto}
+  body:has(.pw-home) .pw-map-filters{position:absolute;top:64px;left:12px;z-index:30}
+  body:has(.pw-home) .pw-map-locate{position:absolute;top:108px;right:12px;z-index:30}
+  body:has(.pw-home) .pw-home-grid{position:relative;display:block!important;width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-home-canvas{position:relative;display:block;width:100%;height:100%;min-height:0}
+  body:has(.pw-home) .pw-map-card{position:absolute;inset:0;z-index:1;display:block!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+  body:has(.pw-home) .pw-map-frame{position:absolute;inset:0;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+  body:has(.pw-home) .pw-map-frame .app-map{height:100%!important;min-height:0;border:0;border-radius:0}
+  body:has(.pw-home) .pw-map-frame .map-title,body:has(.pw-home) .pw-map-card .app-actions{display:none!important}
+  body:has(.pw-home) .pw-map-note{bottom:calc(var(--pw-sheet-visible,250px) + 12px);left:12px;z-index:18}
+  body:has(.pw-home) .pw-home-sheet{position:absolute;left:0;right:0;bottom:0;z-index:24;display:block;width:100%;height:min(640px,calc(100% - 104px));min-height:250px;margin:0;overflow:hidden;transform:translateY(var(--pw-sheet-shift,390px));background:var(--pw-paper);border:2.5px solid var(--pw-edge);border-bottom:0;border-radius:28px 28px 0 0;box-shadow:0 -2px 0 var(--pw-shadow);transition:transform .35s cubic-bezier(.25,.9,.3,1);touch-action:none}
+  body:has(.pw-home) .pw-home-sheet.is-dragging{transition:none;cursor:grabbing}
+  body:has(.pw-home) .pw-sheet-grab{display:flex;align-items:center;justify-content:center;width:100%;height:34px;margin:0;padding:0;border:0;background:transparent;cursor:grab}
+  body:has(.pw-home) .pw-sheet-grab span{display:block;width:42px;height:5px;border-radius:99px;background:var(--pw-stone)}
+  body:has(.pw-home) .pw-home-sheet-body{display:block;height:calc(100% - 34px);padding:0 14px 96px;overflow:hidden}
+  body:has(.pw-home) .pw-home-sheet.is-full .pw-home-sheet-body{overflow-y:auto}
+  body:has(.pw-home) .pw-home-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body:has(.pw-home) #dashboard .pw-home-sheet .pw-streak-card,body:has(.pw-home) #dashboard .pw-home-sheet .pw-goal-card{position:static;display:flex;width:auto;height:138px;min-height:138px;margin:0;padding:12px;border-radius:22px;box-shadow:3px 3px 0 var(--pw-shadow)}
+  body:has(.pw-home) #dashboard .pw-home-sheet .pw-streak-card{align-items:center;justify-content:center;gap:6px;background:var(--pw-ink);color:var(--pw-white)}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card [data-streak-cat]{flex:0 1 64px}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card .pw-cat{width:64px}
+  body:has(.pw-home) .pw-home-sheet .pw-streak-card #streakMetric{font-size:34px}
+  body:has(.pw-home) .pw-home-sheet .pw-goal-card{justify-content:center;gap:7px;background:var(--pw-surface)}
+  body:has(.pw-home) .pw-home-sheet .pw-recent{display:block;height:auto;margin-top:14px}
+  body:has(.pw-home) .pw-home-sheet .pw-recent .pw-entry{min-height:68px;padding:8px 0;border:0;box-shadow:none;background:transparent}
+}

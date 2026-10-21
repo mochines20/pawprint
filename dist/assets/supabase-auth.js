@@ -218,7 +218,7 @@ function onboardingMarkup() {
 }
 
 async function openAuth(mode = "auth", accountMode = "login") {
-  if (window.pawprintDemoMode) return;
+  if (window.pawprintDemoMode && !document.body.classList.contains("demo-auth-open")) return;
   if (!modal) return;
   const requestId = Number(modal.dataset.openRequest || 0) + 1;
   modal.dataset.openRequest = String(requestId);

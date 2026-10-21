@@ -1,4 +1,5 @@
 const APP_HTML = __PAWPRINT_HTML__;
+const ADMIN_HTML = __PAWPRINT_ADMIN_HTML__;
 const SNEAK_PEEK_GIF = "__PAWPRINT_SNEAK_PEEK_GIF__";
 const SNEAK_PEEK_SVG = __PAWPRINT_SNEAK_PEEK_SVG__;
 const PAWPRINT_ICON_SVG = __PAWPRINT_ICON_SVG__;
@@ -9,15 +10,22 @@ const PAW_LOADER_JS = __PAWPRINT_PAW_LOADER_JS__;
 const PAWLOADER_ACTUAL_JS = __PAWPRINT_PAWLOADER_ACTUAL_JS__;
 const PAWLOADER_CSS = __PAWPRINT_PAWLOADER_CSS__;
 const PAWLOADER_BRIDGE = __PAWPRINT_PAWLOADER_BRIDGE__;
+const PAWLAUNCH_JS = __PAWPRINT_PAWLAUNCH_JS__;
+const PAWLAUNCH_CSS = __PAWPRINT_PAWLAUNCH_CSS__;
+const PAWONBOARD_JS = __PAWPRINT_PAWONBOARD_JS__;
+const PAWONBOARD_CSS = __PAWPRINT_PAWONBOARD_CSS__;
+const PAWONBOARD_CAT = __PAWPRINT_PAWONBOARD_CAT__;
 const PAWTRAIL_JS = __PAWPRINT_PAWTRAIL_JS__;
 const OFFLINE_QUEUE_JS = __PAWPRINT_OFFLINE_QUEUE_JS__;
 const ADMIN_CONSOLE_JS = __PAWPRINT_ADMIN_CONSOLE_JS__;
+const ADMIN_APP_JS = __PAWPRINT_ADMIN_APP_JS__;
+const ADMIN_APP_CSS = __PAWPRINT_ADMIN_APP_CSS__;
 const MOBILE_UI_JS = __PAWPRINT_MOBILE_UI_JS__;
 const MOBILE_UI_CSS = __PAWPRINT_MOBILE_UI_CSS__;
 const MOBILE_FONT = __PAWPRINT_MOBILE_FONT__;
 const MOBILE_FONT_LICENSE = __PAWPRINT_MOBILE_FONT_LICENSE__;
 const PWA_MANIFEST = JSON.stringify({ name: "Pawprint", short_name: "Pawprint", start_url: "/#app", display: "standalone", background_color: "#f1f2f4", theme_color: "#ffb815", description: "Gotta spot ’em all—safely.", icons: [{ src: "/assets/pawprint-icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" }] });
-const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v8-reference-ui'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
+const PWA_SERVICE_WORKER = `const CACHE='pawprint-shell-v9-reference-ui'; self.addEventListener('install',event=>{self.skipWaiting();event.waitUntil(caches.open(CACHE).then(cache=>cache.add('/')))}); self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))]))); self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const requestUrl=new URL(event.request.url);const isNavigation=event.request.mode==='navigate'||requestUrl.pathname==='/';event.respondWith(isNavigation?fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;}).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('/'))):caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(requestUrl.origin===location.origin){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('/'))));});`;
 const PWA_SERVICE_WORKER_WITH_PUSH = `${PWA_SERVICE_WORKER} self.addEventListener('push',event=>{const data=event.data?event.data.json():{};event.waitUntil(self.registration.showNotification(data.title||'Pawprint',{body:data.body||'Your Pawprint has an update.',icon:'/assets/pawprint-icon.svg',badge:'/assets/pawprint-icon.svg',data:{url:data.url||'/#app'}}));}); self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{const target=event.notification.data&&event.notification.data.url||'/#app';const existing=list.find(client=>client.url.includes(location.origin));return existing?(existing.focus(),existing.navigate(target)):clients.openWindow(target);}));});`;
 
 const JSON_HEADERS = {
@@ -148,25 +156,27 @@ async function sendBrevoWaitlistEmail(env, email, platformInterest) {
   const senderEmail = String(env.BREVO_SENDER_EMAIL || "").trim();
   if (!apiKey || !senderEmail) return { sent: false, reason: "BREVO_NOT_CONFIGURED" };
   const platform = platformInterest === "ios" ? "iOS" : platformInterest === "android" ? "Android" : "iOS & Android";
+  const publicUrl = String(env.PAWPRINT_PUBLIC_URL || "").replace(/\/$/, "");
+  const logoUrl = publicUrl ? `${publicUrl}/assets/pawprint-logo.png` : "";
+  const logoMarkup = logoUrl
+    ? `<img src="${logoUrl}" alt="Pawprint logo" width="44" height="44" style="display:inline-block;vertical-align:middle;border:2px solid #151515;border-radius:14px;background:#fff;object-fit:cover">`
+    : `<span style="display:inline-block;vertical-align:middle;width:44px;height:44px;border:2px solid #151515;border-radius:14px;background:#ffb400;color:#151515;font-size:22px;font-weight:800;line-height:40px;text-align:center">P</span>`;
   const payload = {
     sender: { email: senderEmail, name: String(env.BREVO_SENDER_NAME || "Pawprint") },
     to: [{ email }],
     subject: "You’re on the Pawprint early-access list",
   };
-  const templateId = Number(env.BREVO_TEMPLATE_ID);
-  if (Number.isInteger(templateId) && templateId > 0) {
-    payload.templateId = templateId;
-    payload.params = { platform, appName: "Pawprint" };
-    delete payload.subject;
-  } else {
-    payload.htmlContent = `<div style="font-family:Arial,sans-serif;line-height:1.5"><h1>Pawprint</h1><p>You’re on the early-access list for <strong>${platform}</strong>.</p><p>We’ll let you know when the browser and native app experience is ready.</p><p>Gotta spot ’em all.</p></div>`;
-  }
+  payload.htmlContent = `<div style="margin:0;background:#faf8f4;color:#151515;font-family:Arial,Helvetica,sans-serif;padding:24px 12px 40px"><div style="max-width:620px;margin:0 auto"><div style="padding:8px 8px 18px">${logoMarkup}<span style="display:inline-block;vertical-align:middle;margin-left:10px;font-size:22px;font-weight:800">Pawprint</span></div><div style="background:#151515;border:2px solid #151515;border-radius:26px 26px 0 0;padding:28px;color:#fff"><div style="color:#ffb400;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase">Early access</div><h1 style="margin:14px 0 12px;font-size:34px;line-height:1.08">Your pawprint is saved.</h1><p style="margin:0;font-size:18px;font-weight:700;line-height:1.45">You’re on the Pawprint early-access list.</p></div><div style="background:#fff;border:2px solid #151515;border-top:0;border-radius:0 0 26px 26px;box-shadow:0 7px 0 #151515;padding:28px"><p style="margin:0 0 24px;color:#77736c;font-size:16px;line-height:1.6">We’ll send launch updates for ${platform}.</p><div style="background:#fff1c9;border:1px solid #f0d88a;border-radius:16px;padding:14px 16px;font-size:14px;line-height:1.5"><strong>🐾 A safer trace starts small.</strong><br>Your updates help us build a kinder, more careful way to spot street cats.</div><p style="margin:24px 0 0;padding-top:18px;border-top:1px solid #e3dfd6;color:#77736c;font-size:13px;line-height:1.55">Public pins stay approximate and delayed for safety.</p></div><p style="margin:28px 10px 0;color:#77736c;font-size:12px;line-height:1.6;text-align:center"><strong style="color:#151515">Pawprint</strong> · Gotta spot ’em all.<br>You’re receiving this because you joined Pawprint updates.</p></div></div>`;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "content-type": "application/json", "api-key": apiKey },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!response.ok) return { sent: false, reason: `BREVO_${response.status}` };
     return { sent: true };
   } catch (error) {
@@ -1238,6 +1248,12 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/admin-console.js") {
         return new Response(ADMIN_CONSOLE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
       }
+      if (request.method === "GET" && url.pathname === "/assets/admin-app.js") {
+        return new Response(ADMIN_APP_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/admin-app.css") {
+        return new Response(ADMIN_APP_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache" } });
+      }
       if (request.method === "GET" && url.pathname === "/assets/fredoka-latin.woff2") {
         return new Response(Uint8Array.from(atob(MOBILE_FONT), c => c.charCodeAt(0)), { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=86400" } });
       }
@@ -1256,7 +1272,23 @@ export default {
       if (request.method === "GET" && url.pathname === "/assets/pawloader-bridge.js") {
         return new Response(PAWLOADER_BRIDGE, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
       }
+      if (request.method === "GET" && url.pathname === "/assets/pawlaunch.js") {
+        return new Response(PAWLAUNCH_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawlaunch.css") {
+        return new Response(PAWLAUNCH_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawonboard.js") {
+        return new Response(PAWONBOARD_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawonboard.css") {
+        return new Response(PAWONBOARD_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
+      if (request.method === "GET" && url.pathname === "/assets/pawprint-cat-onboard.js") {
+        return new Response(PAWONBOARD_CAT, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=86400" } });
+      }
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/auth/callback" || url.pathname === "/onboarding")) return new Response(APP_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      if (request.method === "GET" && (url.pathname === "/admin" || url.pathname === "/admin.html")) return new Response(ADMIN_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
       return new Response("Not found", { status: 404 });
     } catch (error) {
       if (error instanceof Response) return error;

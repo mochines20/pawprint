@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffb400">
+  <title>Pawprint Operations</title>
+  <link rel="stylesheet" href="/assets/admin-app.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <header class="admin-header">
+      <a class="brand" href="/"><span class="brand-mark">🐾</span><span>Pawprint <small>Operations</small></span></a>
+      <button class="ghost-button" id="signOutButton" type="button" hidden>Sign out</button>
+    </header>
+    <section class="admin-card auth-card" id="authCard">
+      <span class="eyebrow">Private operations</span>
+      <h1>Keep the cat map gentle.</h1>
+      <p>Sign in with an approved Pawprint admin account to review reports, AI checks, care flags, and platform health.</p>
+      <form id="adminLoginForm" class="admin-form">
+        <label>Email<input id="adminEmail" name="email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="adminPassword" name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-button" type="submit">Sign in to operations</button>
+      </form>
+      <p class="status" id="authStatus" role="status" aria-live="polite"></p>
+    </section>
+    <section id="dashboard" hidden>
+      <div class="page-heading"><div><span class="eyebrow">Live queue</span><h1>Operations dashboard</h1><p id="adminIdentity"></p></div><button class="primary-button" id="refreshButton" type="button">Refresh queues</button></div>
+      <p class="status" id="dashboardStatus" role="status" aria-live="polite"></p>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="queue-grid">
+        <section class="admin-card"><div class="section-heading"><div><span class="eyebrow">Safety review</span><h2>Moderation queue</h2></div><span class="queue-count" id="moderationCount">0</span></div><div class="queue-list" id="moderationList"></div></section>
+        <section class="admin-card"><div class="section-heading"><div><span class="eyebrow">Community care</span><h2>Care flags</h2></div><span class="queue-count" id="careCount">0</span></div><div class="queue-list" id="careList"></div></section>
+      </div>
+    </section>
+    <footer>Admin access is audited. Keep exact locations private and review only what is needed for safety.</footer>
+  </main>
+  <script type="module" src="/assets/admin-app.js"></script>
+</body>
+</html>

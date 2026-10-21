@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { sendPushNotification } from "npm:@mmmike/web-push@1.0.1/send";
+import { pawprintEmailTemplate } from "./email-templates.ts";
 
 const headers = {
   "access-control-allow-origin": "*",
@@ -78,7 +80,7 @@ async function hash(bytes: Uint8Array) {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-const validationPrompt = "Inspect this camera capture for Pawprint. Return JSON only with catDetected, personDetected, screenshotDetected, unsafe, aiGenerated, catConfidence, breedConfidence, aiGeneratedConfidence, suggestedBreed, suggestedCoatType, reason. Reject people, screenshots, collages, and images without a clearly visible real cat. Do not call a normal cat AI-generated. Suggest a breed only when supported.";
+const validationPrompt = "Inspect this camera capture for Pawprint. Return JSON only with catDetected, personDetected, screenshotDetected, unsafe, aiGenerated, catConfidence, breedConfidence, aiGeneratedConfidence, suggestedBreed, suggestedCoatType, reason. Accept only a clearly visible real cat photographed by a camera. Reject people, screenshots, collages, cartoons, drawings, logos, illustrations, rendered mockups, and images without a clearly visible real cat. Do not call a normal cat AI-generated. Suggest a breed only when supported.";
 
 function normalizeValidation(result: Record<string, unknown>) {
   const catDetected = result.catDetected === true;
@@ -110,41 +112,148 @@ function parseModelJson(value: string) {
 async function validatePhoto(bytes: Uint8Array, contentType: string) {
   const provider = String(Deno.env.get("AI_PROVIDER") || "gemini").toLowerCase();
   const encoded = bytesToBase64(bytes);
-  try {
-    if ((provider === "ollama" || Deno.env.get("OLLAMA_BASE_URL")) && Deno.env.get("OLLAMA_BASE_URL")) {
-      const result = await fetch(`${Deno.env.get("OLLAMA_BASE_URL")!.replace(/\/$/, "")}/api/chat`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: Deno.env.get("OLLAMA_MODEL") || "qwen2.5vl:7b", stream: false, options: { temperature: 0 }, messages: [{ role: "system", content: validationPrompt }, { role: "user", content: "Analyze this image and return JSON only.", images: [encoded] }] }) });
-      if (!result.ok) throw new Error(`OLLAMA_${result.status}`);
-      const payload = await result.json();
-      return normalizeValidation(parseModelJson(payload.message?.content || payload.response || "{}"));
-    }
+  const unavailable = (detail: string) => ({ status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catDetected: false, personDetected: false, screenshotDetected: false, unsafe: false, aiGenerated: false, catConfidence: 0, aiConfidence: 0, catType: "Unclassified cat", catBreed: null, coatType: null, detail: detail.slice(0, 500) });
+  const runOllama = async () => {
+    const base = Deno.env.get("OLLAMA_BASE_URL");
+    if (!base) throw new Error("OLLAMA_NOT_CONFIGURED");
+    const result = await fetch(`${base.replace(/\/$/, "")}/api/chat`, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(25000), body: JSON.stringify({ model: Deno.env.get("OLLAMA_MODEL") || "qwen2.5vl:7b", stream: false, options: { temperature: 0 }, messages: [{ role: "system", content: validationPrompt }, { role: "user", content: "Analyze this image and return JSON only.", images: [encoded] }] }) });
+    if (!result.ok) throw new Error(`OLLAMA_${result.status}`);
+    const payload = await result.json();
+    return normalizeValidation(parseModelJson(payload.message?.content || payload.response || "{}"));
+  };
+  const runGemini = async () => {
     const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return { status: "needs_review", reason: "AI_VALIDATION_NOT_CONFIGURED", catDetected: false, personDetected: false, screenshotDetected: false, unsafe: false, aiGenerated: false, catConfidence: 0, aiConfidence: 0, catType: "Unclassified cat", catBreed: null, coatType: null, detail: "Configure Gemini or Ollama in Supabase Edge Function secrets." };
-    const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
-    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify({ contents: [{ parts: [{ text: validationPrompt }, { inlineData: { mimeType: contentType || "image/jpeg", data: encoded } }] }], generationConfig: { temperature: 0, responseMimeType: "application/json" } }) });
+    if (!key) throw new Error("GEMINI_NOT_CONFIGURED");
+    const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.5-flash-lite";
+    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(30000), body: JSON.stringify({ contents: [{ parts: [{ text: validationPrompt }, { inlineData: { mimeType: contentType || "image/jpeg", data: encoded } }] }], generationConfig: { temperature: 0, responseMimeType: "application/json" } }) });
     if (!result.ok) throw new Error(`GEMINI_${result.status}`);
     const payload = await result.json();
     const text = payload.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "{}";
     return normalizeValidation(parseModelJson(text));
-  } catch (error) {
-    return { status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catDetected: false, personDetected: false, screenshotDetected: false, unsafe: false, aiGenerated: false, catConfidence: 0, aiConfidence: 0, catType: "Unclassified cat", catBreed: null, coatType: null, detail: String(error instanceof Error ? error.message : error).slice(0, 500) };
+  };
+  const order = provider === "ollama" ? ["ollama", "gemini"] : ["gemini", "ollama"];
+  const errors: string[] = [];
+  for (const name of order) {
+    try { return name === "ollama" ? await runOllama() : await runGemini(); }
+    catch (error) { errors.push(`${name}:${String(error instanceof Error ? error.message : error)}`); }
   }
+  return unavailable(errors.join(" | ") || "Configure Gemini or Ollama in Supabase Edge Function secrets.");
 }
 
 async function sendBrevoConfirmation(email: string, platform: string) {
   const key = Deno.env.get("BREVO_API_KEY");
   const sender = Deno.env.get("BREVO_SENDER_EMAIL");
   if (!key || !sender) return { sent: false, reason: "BREVO_NOT_CONFIGURED" };
+  const appUrl = Deno.env.get("PAWPRINT_PUBLIC_URL");
+  const logoUrl = appUrl ? `${appUrl.replace(/\/$/, "")}/assets/pawprint-logo.png` : undefined;
+  const platformLabel = platform === "ios_android" ? "iOS and Android" : platform === "ios" ? "iOS" : platform === "android" ? "Android" : platform;
   const payload: Record<string, unknown> = {
     sender: { email: sender, name: Deno.env.get("BREVO_SENDER_NAME") || "Pawprint" },
     to: [{ email }],
-    subject: "Pawprint early access",
-    htmlContent: `<p>You're on the Pawprint early-access list.</p><p>We'll send launch updates for <strong>${platform}</strong>.</p>`,
+    subject: "You're on the Pawprint early-access list",
+    textContent: `You're on the Pawprint early-access list. We'll send launch updates for ${platformLabel}. Public pins stay approximate and delayed for safety.`,
+    htmlContent: pawprintEmailTemplate({
+      logoUrl,
+      eyebrow: "Early access",
+      title: "Your pawprint is saved.",
+      intro: "You're on the Pawprint early-access list.",
+      body: `We'll send launch updates for ${platformLabel}.`,
+      ctaLabel: "Open Pawprint",
+      ctaUrl: appUrl,
+      footerNote: "Public pins stay approximate and delayed for safety.",
+    }),
   };
-  const templateId = Number(Deno.env.get("BREVO_TEMPLATE_ID"));
-  if (Number.isFinite(templateId) && templateId > 0) { delete payload.htmlContent; payload.templateId = templateId; payload.params = { platform }; }
-  const result = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "content-type": "application/json", "api-key": key }, body: JSON.stringify(payload) });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let result: Response;
+  try {
+    result = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "content-type": "application/json", "api-key": key }, body: JSON.stringify(payload), signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!result.ok) throw new Error(`BREVO_${result.status}`);
   return { sent: true };
+}
+
+async function sendBrevoAuthCode(email: string, code: string) {
+  const key = Deno.env.get("BREVO_API_KEY");
+  const sender = Deno.env.get("BREVO_SENDER_EMAIL");
+  if (!key || !sender) throw new Error("BREVO_NOT_CONFIGURED");
+  const appUrl = Deno.env.get("PAWPRINT_PUBLIC_URL");
+  const logoUrl = appUrl ? `${appUrl.replace(/\/$/, "")}/assets/pawprint-logo.png` : undefined;
+  const payload: Record<string, unknown> = {
+    sender: { email: sender, name: Deno.env.get("BREVO_SENDER_NAME") || "Pawprint" },
+    to: [{ email }],
+    subject: "Your Pawprint sign-in code",
+    textContent: `Your Pawprint sign-in code is ${code}. It expires shortly. If you did not request this, you can ignore this email.`,
+    htmlContent: pawprintEmailTemplate({
+      logoUrl,
+      eyebrow: "Secure sign-in",
+      title: "Your pawprint code.",
+      intro: "Use this one-time code to load your live Pawprint data.",
+      body: `Your sign-in code is ${code}. It expires shortly. If you did not request this code, you can safely ignore this email.`,
+      footerNote: "Pawprint keeps your account private. Public pins remain approximate and delayed for safety.",
+    }),
+  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let result: Response;
+  try {
+    result = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "content-type": "application/json", "api-key": key }, body: JSON.stringify(payload), signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!result.ok) throw new Error(`BREVO_${result.status}`);
+  return { sent: true };
+}
+
+function createPublicAuthClient() {
+  return createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_ANON_KEY") || "", { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+}
+
+function pushVapid() {
+  const publicKey = Deno.env.get("PUSH_PUBLIC_KEY");
+  const privateKey = Deno.env.get("PUSH_PRIVATE_KEY");
+  if (!publicKey || !privateKey) return null;
+  return {
+    subject: Deno.env.get("PUSH_SUBJECT") || "https://pawprint.madison88-0851.chatgpt.site",
+    publicKey,
+    privateKey,
+  };
+}
+
+async function sendPushToUser(supabase: SupabaseClient, userId: string, payload: { title: string; body: string; url?: string; tag?: string }) {
+  const vapid = pushVapid();
+  if (!vapid) return { delivered: 0, removed: 0 };
+  const subscriptions = await supabase.from("push_subscriptions").select("id,endpoint,p256dh,auth").eq("user_id", userId);
+  if (subscriptions.error) { console.error("PUSH_SUBSCRIPTIONS_READ_FAILED", subscriptions.error); return { delivered: 0, removed: 0 }; }
+  let delivered = 0;
+  const expired: string[] = [];
+  for (const item of subscriptions.data || []) {
+    if (!String(item.endpoint || "").startsWith("https://") || !item.p256dh || !item.auth) { expired.push(item.endpoint); continue; }
+    try {
+      const sent = await sendPushNotification(
+        { endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth } },
+        { title: payload.title, body: payload.body, url: payload.url || "/#app", tag: payload.tag || "pawprint" },
+        vapid,
+        { ttl: 3600, urgency: "normal" },
+      );
+      if (sent) delivered += 1;
+      else expired.push(item.endpoint);
+    } catch (error) {
+      const status = Number((error as { statusCode?: number })?.statusCode || 0);
+      if (status === 404 || status === 410) expired.push(item.endpoint);
+      else console.error("PUSH_DELIVERY_FAILED", status || "unknown");
+    }
+  }
+  if (expired.length) await supabase.from("push_subscriptions").delete().eq("user_id", userId).in("endpoint", expired);
+  return { delivered, removed: expired.length };
+}
+
+async function createNotification(supabase: SupabaseClient, userId: string, type: string, title: string, body: string, url = "/#app") {
+  const result = await supabase.from("notifications").insert({ user_id: userId, type, title, body });
+  if (result.error) throw result.error;
+  await sendPushToUser(supabase, userId, { title, body, url, tag: type });
 }
 
 async function requireUser(request: Request, supabase: SupabaseClient) {
@@ -154,7 +263,7 @@ async function requireUser(request: Request, supabase: SupabaseClient) {
 async function profile(supabase: SupabaseClient, user: { id: string; email?: string }) {
   const userProfile = await ensureProfile(supabase, user);
   const settings = await supabase.from("user_settings").select("*").eq("user_id", user.id).maybeSingle();
-  return { id: user.id, email: user.email || null, display_name: userProfile.nickname, avatar_url: userProfile.avatar, age_group: userProfile.age_group, time_zone: userProfile.time_zone || "Asia/Manila", language: userProfile.language || "en", ...(settings.data || {}) };
+  return { id: user.id, email: user.email || null, display_name: userProfile.nickname, avatar_url: userProfile.avatar, age_group: userProfile.age_group, gender: userProfile.gender || null, location_area: userProfile.location_area || null, onboarding_completed: Boolean(userProfile.onboarding_completed), time_zone: userProfile.time_zone || "Asia/Manila", language: userProfile.language || "en", ...(settings.data || {}) };
 }
 
 async function dashboard(supabase: SupabaseClient, user: { id: string }) {
@@ -224,7 +333,7 @@ async function createSighting(request: Request, supabase: SupabaseClient, user: 
     streak = { current, best: Math.max(current, Number(old.data?.best_count || 0)), freezes: Math.max(0, Number(old.data?.freeze_count || 1) - (canFreeze ? 1 : 0)) };
     await supabase.from("streaks").upsert({ user_id: user.id, current_count: streak.current, best_count: streak.best, freeze_count: streak.freezes, last_local_day: localDay, updated_at: now() });
     await supabase.from("reward_ledger").upsert({ user_id: user.id, sighting_id: sightingId, kind: "sighting_xp", amount: 24 });
-    await supabase.from("notifications").insert({ user_id: user.id, type: "sighting", title: "Pawprint saved", body: `Your ${catType} sighting earned XP.` });
+    await createNotification(supabase, user.id, "sighting", "Pawprint saved", `Your ${catType} sighting earned XP.`, "/#app");
   }
   if (validation.status !== "accepted") await supabase.from("moderation_queue").insert({ target_type: "sighting", target_id: sightingId, reason: validation.reason });
   const body = { sightingId, status: validation.status, reason: validation.reason, catType, rarity: rarity(catType), description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), validation: { ...validation }, rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
@@ -236,12 +345,31 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
   const method = request.method;
   if (path === "/api/health") return response({ ok: true, service: "pawprint-supabase", persistence: "supabase", storage: "supabase-storage", aiValidationConfigured: Boolean(Deno.env.get("GEMINI_API_KEY") || Deno.env.get("OLLAMA_BASE_URL")), brevoConfigured: Boolean(Deno.env.get("BREVO_API_KEY")), pushConfigured: Boolean(Deno.env.get("PUSH_PUBLIC_KEY") && Deno.env.get("PUSH_PRIVATE_KEY")) });
   if (path === "/api/auth/config") return response({ enabled: Boolean(Deno.env.get("SUPABASE_URL") && Deno.env.get("SUPABASE_ANON_KEY")), url: Deno.env.get("SUPABASE_URL") || "", anonKey: Deno.env.get("SUPABASE_ANON_KEY") || "", providers: { google: Deno.env.get("SUPABASE_GOOGLE_AUTH_ENABLED") === "true", apple: Deno.env.get("SUPABASE_APPLE_AUTH_ENABLED") === "true" } });
+  if (path === "/api/auth/send-code" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const email = String(body.email || "").trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return errorResponse("INVALID_EMAIL", 400);
+    const generated = await supabase.auth.admin.generateLink({ type: "magiclink", email });
+    if (generated.error || !generated.data?.properties?.email_otp) throw generated.error || new Error("AUTH_CODE_NOT_CREATED");
+    await sendBrevoAuthCode(email, generated.data.properties.email_otp);
+    return response({ status: "sent", provider: "brevo" });
+  }
+  if (path === "/api/auth/verify-code" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const email = String(body.email || "").trim().toLowerCase();
+    const token = String(body.token || "").trim();
+    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\d{6,8}$/.test(token)) return errorResponse("INVALID_CODE", 400);
+    const authClient = createPublicAuthClient();
+    const verified = await authClient.auth.verifyOtp({ email, token, type: "email" });
+    if (verified.error || !verified.data.session) return errorResponse("INVALID_OR_EXPIRED_CODE", 400);
+    return response({ session: verified.data.session, user: verified.data.user });
+  }
   if (path === "/api/waitlist" && method === "POST") {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || "").trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) return errorResponse("INVALID_EMAIL", 400);
     const platform = String(body.platformInterest || "ios_android");
-    const result = await supabase.from("waitlist_signups").upsert({ email, platform_interest: platform, source: String(body.source || "landing") }, { onConflict: "email", ignoreDuplicates: true });
+    const result = await supabase.from("waitlist_signups").upsert({ id: crypto.randomUUID(), email, platform_interest: platform, source: String(body.source || "landing"), created_at: new Date().toISOString() }, { onConflict: "email", ignoreDuplicates: true });
     if (result.error) throw result.error;
     let confirmationEmail = "queued";
     try { confirmationEmail = (await sendBrevoConfirmation(email, platform)).sent ? "sent" : "queued"; } catch (error) { console.error(error); }
@@ -256,6 +384,11 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
     if (body.displayName !== undefined) fields.nickname = String(body.displayName).slice(0, 40);
     if (body.avatarUrl !== undefined) fields.avatar = String(body.avatarUrl).slice(0, 80);
     if (body.ageGroup !== undefined) fields.age_group = String(body.ageGroup);
+    if (body.gender !== undefined) fields.gender = String(body.gender).slice(0, 40);
+    if (body.locationArea !== undefined) fields.location_area = String(body.locationArea).trim().slice(0, 80);
+    if (body.onboardingCompleted !== undefined) fields.onboarding_completed = Boolean(body.onboardingCompleted);
+    if (body.privacyConsentVersion !== undefined) fields.privacy_notice_version = String(body.privacyConsentVersion).slice(0, 40);
+    if (body.privacyConsentAt !== undefined) fields.privacy_consent_at = String(body.privacyConsentAt);
     if (body.timeZone !== undefined) fields.time_zone = String(body.timeZone).slice(0, 80);
     if (body.language !== undefined) fields.language = String(body.language).slice(0, 20);
     if (Object.keys(fields).length) await supabase.from("profiles").update(fields).eq("id", user.id);
@@ -292,8 +425,15 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
     const days = Array.from({ length: 7 }, (_, index) => { const date = new Date(Date.now() - (6 - index) * 86400000); const key = date.toISOString().slice(0, 10); return { key, status: active.has(key) ? "complete" : key === new Date().toISOString().slice(0, 10) ? "today" : "empty", label: new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date), number: date.getUTCDate() }; });
     return response({ days });
   }
-  if (path === "/api/push/config" && method === "GET") return response({ configured: Boolean(Deno.env.get("PUSH_PUBLIC_KEY")), publicKey: Deno.env.get("PUSH_PUBLIC_KEY") || null });
-  if (path === "/api/push/subscriptions" && method === "POST") { const body = await request.json(); const result = await supabase.from("push_subscriptions").upsert({ user_id: user.id, endpoint: body.endpoint, p256dh: body.keys?.p256dh, auth: body.keys?.auth, updated_at: now() }, { onConflict: "endpoint" }); if (result.error) throw result.error; return response({ status: "saved" }, 201); }
+  if (path === "/api/push/config" && method === "GET") return response({ configured: Boolean(pushVapid()), publicKey: Deno.env.get("PUSH_PUBLIC_KEY") || null });
+  if (path === "/api/push/subscriptions" && method === "POST") {
+    const body = await request.json();
+    const endpoint = String(body.endpoint || "");
+    if (!endpoint.startsWith("https://") || !body.keys?.p256dh || !body.keys?.auth) return errorResponse("INVALID_PUSH_SUBSCRIPTION", 400);
+    const result = await supabase.from("push_subscriptions").upsert({ user_id: user.id, endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth, updated_at: now() }, { onConflict: "endpoint" });
+    if (result.error) throw result.error;
+    return response({ status: "saved" }, 201);
+  }
   if (path === "/api/push/subscriptions" && method === "DELETE") { const body = await request.json().catch(() => ({})); await supabase.from("push_subscriptions").delete().eq("user_id", user.id).eq("endpoint", body.endpoint); return response({ status: "deleted" }); }
   if (path === "/api/community" && method === "GET") { const kind = new URL(request.url).searchParams.get("kind"); let query = supabase.from("community_assets").select("*").order("created_at", { ascending: false }).limit(100); if (kind) query = query.eq("kind", kind); const result = await query; return response({ assets: result.data || [] }); }
   if (path === "/api/community-assets" && method === "GET") { const result = await supabase.from("community_assets").select("*").order("created_at", { ascending: false }).limit(100); return response({ assets: result.data || [] }); }

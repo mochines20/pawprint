@@ -1,4 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
+const publicDemoOnly = () => window.PAWPRINT_PUBLIC_DEMO_ONLY === true;
 let authConfigPromise = null;
 let authClientPromise = null;
 let authStateSubscription = null;
@@ -26,6 +27,7 @@ function loadAuthConfig() {
 }
 
 async function ensureAuthClient() {
+  if (publicDemoOnly()) return null;
   const config = authConfig || await loadAuthConfig();
   if (!config?.enabled || !config.url || !config.anonKey) return null;
   if (client) return client;
@@ -68,7 +70,13 @@ let authConfig = null;
 let modal = null;
 let statusNode = null;
 window.pawprintAuthGate = window.pawprintAuthGate || { ready: false, queue: [] };
-window.pawprintOpenAuth = (accountMode = "login") => openAuth("auth", accountMode);
+window.pawprintOpenAuth = (accountMode = "login") => {
+  if (publicDemoOnly()) {
+    window.notify?.("Sign-in is coming in a future release. Explore the demo for now.");
+    return false;
+  }
+  return openAuth("auth", accountMode);
+};
 
 function releaseAuthGate() {
   if (window.pawprintAuthGate.ready) return;
@@ -218,7 +226,7 @@ function onboardingMarkup() {
 }
 
 async function openAuth(mode = "auth", accountMode = "login") {
-  if (window.pawprintDemoMode) return;
+  if (window.pawprintDemoMode && !document.body.classList.contains("demo-auth-open")) return;
   if (!modal) return;
   const requestId = Number(modal.dataset.openRequest || 0) + 1;
   modal.dataset.openRequest = String(requestId);
@@ -474,13 +482,18 @@ async function handleOnboarding(event) {
   updateTriggers();
 }
 
-async function handleSignOut() {
-  if (!client) return;
-  await client.auth.signOut();
+async function handleSignOut({ quiet = false } = {}) {
+  if (client) await client.auth.signOut();
   window.pawprintSession = null;
+  window.pawprintAppUser = null;
+  window.pawprintPublicProfile = null;
   updateTriggers();
-  window.notify?.("Signed out.");
+  if (!quiet) window.notify?.("Signed out.");
 }
+
+// The app shell uses this when a signed-in user explicitly returns to the public landing page.
+// Keeping it public avoids a second, stale client-side session on the next app entry.
+window.pawprintSignOut = handleSignOut;
 
 function bindModal() {
   modal.addEventListener("click", async (event) => {
@@ -527,6 +540,16 @@ function bindModal() {
 
 function bindDocumentTriggers() {
   document.addEventListener("click", (event) => {
+    if (publicDemoOnly()) {
+      const appTrigger = event.target.closest("[data-open-app]");
+      const authTrigger = event.target.closest("[data-open-auth]");
+      if (!appTrigger && !authTrigger) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (appTrigger) window.pawprintOpenDemo?.();
+      else window.notify?.("Sign-in is coming in a future release. Explore the demo for now.");
+      return;
+    }
     const appTrigger = event.target.closest("[data-open-app]");
     if (appTrigger && !window.pawprintSession) {
       event.preventDefault();
@@ -544,6 +567,16 @@ function bindDocumentTriggers() {
 }
 
 function protectAppRoute() {
+  if (publicDemoOnly()) {
+    if (location.hash === "#app" && new URLSearchParams(location.search).get("demo") !== "1") {
+      const demoUrl = new URL(location.href);
+      demoUrl.searchParams.set("demo", "1");
+      demoUrl.hash = "app";
+      history.replaceState({}, "", demoUrl.toString());
+      window.pawprintOpenDemo?.();
+    }
+    return;
+  }
   if (window.pawprintDemoMode || location.hash !== "#app" || window.pawprintSession) return;
   window.pawprintAuthGate.pendingApp = true;
   document.body.classList.remove("is-app");
@@ -553,6 +586,13 @@ function protectAppRoute() {
 
 async function init() {
   addStyles();
+  if (publicDemoOnly()) {
+    window.pawprintSession = null;
+    releaseAuthGate();
+    protectAppRoute();
+    window.addEventListener("hashchange", protectAppRoute);
+    return;
+  }
   modal = document.createElement("div");
   modal.className = "auth-backdrop";
   modal.setAttribute("aria-hidden", "true");

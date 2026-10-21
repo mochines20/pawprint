@@ -6,6 +6,7 @@
   if (!actual) return;
   const MIN_DELAY = 200;
   const MIN_VISIBLE = 400;
+  let appBootHandle = null;
   const toActualOptions = (options = {}) => ({
     variant: options.variant,
     size: options.size,
@@ -156,6 +157,8 @@
       if (method === 'POST' && path === '/api/sightings') return { variant: 'paws', size: 'md', label: 'Checking for a cat…' };
       if (method === 'GET' && path === '/api/dashboard') return { variant: 'paws', size: 'md', label: 'Checking for a cat…', delayMs: 0 };
       if (method === 'GET' && path === '/api/map') return { variant: 'pin', size: 'md', label: 'Checking for a cat…' };
+      if (method === 'GET' && path === '/api/sightings') return { variant: 'pin', size: 'md', label: 'Loading your sightings…', target: '.app-map' };
+      if (method === 'GET' && path === '/api/me') return { variant: 'paws', size: 'md', label: 'Loading your profile…', target: '#dashboard' };
       if (method === 'GET' && path === '/api/journal') return { variant: 'paws', size: 'md', label: 'Loading your Journal…', target: '#journalEntries' };
       if (method === 'GET' && path === '/api/care-flags') return { variant: 'paws', size: 'md', label: 'Loading Care Flags…', target: '#flagList' };
       if (method === 'GET' && path === '/api/progress') return { variant: 'paws', size: 'md', label: 'Loading quests and medals…', target: '#dashboard' };
@@ -171,14 +174,48 @@
       const config = requestConfig(url.pathname, method);
       let loader = null;
       let phaseTimer = null;
-      if (config) loader = config.target ? showInline(config.target, config) : url.pathname === '/api/map' ? showInline('.app-map', config) : showOverlay(config);
+      const isBootDashboard = Boolean(appBootHandle && method === 'GET' && url.pathname === '/api/dashboard');
+      if (config && !isBootDashboard) loader = config.target ? showInline(config.target, config) : url.pathname === '/api/map' ? showInline('.app-map', config) : showOverlay(config);
+      if (isBootDashboard) loader = appBootHandle;
       if (loader && method === 'POST' && url.pathname === '/api/sightings') phaseTimer = window.setTimeout(() => loader.update({ variant: 'pin', label: 'Saving your sighting…' }), 900);
       const timeout = loader ? window.setTimeout(() => loader.showTimeout(), 15000) : null;
       try { return await originalFetch(input, init); }
-      finally { if (timeout) window.clearTimeout(timeout); if (phaseTimer) window.clearTimeout(phaseTimer); loader?.hide(); }
+      finally {
+        if (timeout) window.clearTimeout(timeout);
+        if (phaseTimer) window.clearTimeout(phaseTimer);
+        loader?.hide();
+        if (isBootDashboard) appBootHandle = null;
+      }
     };
     wrapped.__pawLoaderWrapped = true;
     window.fetch = wrapped;
+  }
+
+  function startAppBootLoader() {
+    if (location.hash !== '#app' || appBootHandle) return;
+    appBootHandle = showOverlay({
+      variant: 'paws',
+      size: 'lg',
+      label: 'Checking for a cat…',
+      delayMs: 0,
+      minMs: 500,
+    });
+    const stopIfLeavingApp = () => {
+      if (location.hash !== '#app') {
+        appBootHandle?.hide();
+        appBootHandle = null;
+        window.removeEventListener('hashchange', stopIfLeavingApp);
+      }
+    };
+    window.addEventListener('hashchange', stopIfLeavingApp);
+    // Demo mode has no dashboard request, so do not leave the boot overlay up.
+    if (new URLSearchParams(location.search).get('demo') === '1') {
+      window.setTimeout(() => {
+        appBootHandle?.hide();
+        appBootHandle = null;
+        window.removeEventListener('hashchange', stopIfLeavingApp);
+      }, 1200);
+    }
   }
 
   function init() {
@@ -188,6 +225,7 @@
     document.addEventListener('visibilitychange', () => document.body.classList.toggle('pl-hidden', document.hidden));
     observeBusyButtons();
     trackRequests();
+    startAppBootLoader();
   }
 
   const styles = document.createElement('style');

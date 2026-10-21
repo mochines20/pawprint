@@ -122,7 +122,7 @@ function sendJson(response, data, status = 200) {
 }
 
 function safePath(requestPath) {
-  const relative = requestPath === "/" ? "index.html" : requestPath.replace(/^\/+/, "");
+  const relative = requestPath === "/" ? "index.html" : requestPath === "/admin" ? "admin.html" : requestPath.replace(/^\/+/, "");
   const target = resolve(root, normalize(relative));
   return target.startsWith(`${root}${sep}`) ? target : null;
 }
@@ -204,8 +204,11 @@ const server = createServer(async (request, response) => {
       supabaseConfigured: Boolean((process.env.PAWPRINT_SUPABASE_URL || process.env.SUPABASE_URL) && (process.env.PAWPRINT_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY)),
       aiValidationConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.OLLAMA_BASE_URL || process.env.OLLAMA_API_URL || process.env.AI_VALIDATION_URL),
       brevoConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
-      pushConfigured: Boolean(process.env.PUSH_PUBLIC_KEY),
+      pushConfigured: Boolean(process.env.PUSH_PUBLIC_KEY || supabaseFunctionOrigin),
+      pushSource: supabaseFunctionOrigin ? "supabase-edge-function" : "local-preview",
       persistence: supabaseFunctionOrigin ? "supabase-edge-function" : "preview-only",
+      storage: supabaseFunctionOrigin ? "supabase-storage" : null,
+      storageConfigured: Boolean(supabaseFunctionOrigin),
       backendOrigin: supabaseFunctionOrigin || null,
     }));
     return;

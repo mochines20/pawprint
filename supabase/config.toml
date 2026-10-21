@@ -1,0 +1,7 @@
+project_id = "xfmackyuxabagrstrpku"
+
+[functions.pawprint-api]
+verify_jwt = false
+
+[functions.pawprint-maintenance]
+verify_jwt = false

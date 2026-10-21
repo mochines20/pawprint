@@ -18,9 +18,28 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Pawprint — Gotta spot ’em all.</title>
+  <script>
+    window.PAWPRINT_PUBLIC_DEMO_ONLY = true;
+    (() => {
+      const publicFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const requestUrl = typeof input === 'string' ? input : input?.url;
+        const url = new URL(requestUrl || location.href, location.href);
+        const isPrivateApi = window.PAWPRINT_PUBLIC_DEMO_ONLY === true && url.origin === location.origin && url.pathname.startsWith('/api/') && url.pathname !== '/api/waitlist';
+        if (isPrivateApi) {
+          return Promise.resolve(new Response(JSON.stringify({ error: 'DEMO_ONLY' }), {
+            status: 403,
+            headers: { 'content-type': 'application/json' }
+          }));
+        }
+        return publicFetch(input, init);
+      };
+    })();
+  </script>
   <style>
     :root { --ink:#171717; --muted:#8b8e94; --soft:#f1f2f4; --line:#e6e7e9; --white:#fff; --amber:#ffb815; --care:#e55745; --radius:28px; --font-body:"Poppins",ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif; --font-display:"Nunito",ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif; --font:var(--font-body); }
-    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;overflow-x:hidden;color:var(--ink);background:var(--soft);font-family:var(--font);font-size:16px;line-height:1.45} button,a{font:inherit} button{cursor:pointer} a{color:inherit;text-decoration:none} button:focus-visible,a:focus-visible{outline:3px solid var(--amber);outline-offset:3px}.shell{width:min(1160px,calc(100% - 40px));margin:0 auto}.skip-link{position:absolute;left:-999px;top:8px;z-index:50}.skip-link:focus{left:8px;background:#fff;padding:8px 12px;border-radius:10px}
+    *{box-sizing:border-box} html{scroll-behavior:smooth;scroll-padding-top:84px} body{margin:0;overflow-x:hidden;color:var(--ink);background:var(--soft);font-family:var(--font);font-size:16px;line-height:1.45} button,a{font:inherit} button{cursor:pointer} a{color:inherit;text-decoration:none} button:focus-visible,a:focus-visible{outline:3px solid var(--amber);outline-offset:3px}.shell{width:min(1160px,calc(100% - 40px));margin:0 auto}.skip-link{position:absolute;left:-999px;top:8px;z-index:50}.skip-link:focus{left:8px;background:#fff;padding:8px 12px;border-radius:10px}
+    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
     h1,h2,h3,h4,h5,h6,.brand,.btn,.eyebrow,.device-title,.mock-stat{font-family:var(--font-display)}
     .topbar{position:sticky;top:0;z-index:30;padding:13px 0;background:rgba(241,242,244,.87);backdrop-filter:blur(15px)}.nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 6px}.brand{display:flex;align-items:center;gap:10px;font-size:1.06rem;font-weight:900;letter-spacing:-.04em}.brand-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;background:var(--ink);color:#fff}.brand-mark svg{width:20px}.nav-links{display:flex;gap:26px;color:#707378;font-size:.9rem}.nav-links a:hover{color:var(--ink)}.nav-actions{display:flex;gap:9px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:45px;padding:0 18px;border:0;border-radius:999px;font-weight:850;transition:transform .18s,box-shadow .18s,background .18s}.btn:hover{transform:translateY(-2px)}.btn-dark{background:var(--ink);color:#fff;box-shadow:0 4px 0 #000}.btn-dark:hover{box-shadow:0 6px 0 #000}.btn-amber{background:var(--amber);color:var(--ink);box-shadow:0 4px 0 #d18e00}.btn-light{background:#fff;color:var(--ink);border:1px solid var(--line)}.btn-small{min-height:38px;padding:0 14px;font-size:.85rem}
     .eyebrow{display:inline-flex;align-items:center;gap:8px;color:#7f8288;font-size:.7rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--amber)}.hero{padding:70px 0 45px}.hero-grid{display:grid;grid-template-columns:.88fr 1.12fr;align-items:center;gap:65px}.hero h1{max-width:580px;margin:20px 0 19px;font-size:clamp(3.9rem,7.7vw,6.8rem);line-height:.9;letter-spacing:-.09em}.hero h1 span{display:block;color:#96999e}.hero-copy{max-width:510px;color:#707378;font-size:1.08rem}.hero-actions{display:flex;flex-wrap:wrap;gap:11px;margin:28px 0 18px}.microcopy{color:#97999e;font-size:.82rem}.microcopy b{color:var(--ink)}
@@ -443,10 +462,18 @@
       body.is-app .modal .modal-actions .btn { width: 100%; border: 2px solid #151515; box-shadow: 0 4px 0 #151515; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/mobile-ui.css?v=reference-20261016-6">
+  <link rel="stylesheet" href="/assets/pawlaunch.css?v=launch-20261019-1">
+  <link rel="stylesheet" href="/assets/pawonboard.css?v=onboard-20261021-1">
+  <link rel="stylesheet" href="/assets/mobile-ui.css?v=reference-20261021-7">
 </head>
 <body>
-  <script src="/assets/mobile-ui.js?v=reference-20261016-9"></script>
+  <script src="/assets/pawlaunch.js?v=launch-20261019-1"></script>
+  <script>
+    window.pawLaunchPromise=window.PawLaunch?.show({once:'session',minMs:2600,ready:document.fonts?.ready||Promise.resolve()})||Promise.resolve();
+  </script>
+  <script src="/assets/pawprint-cat-onboard.js?v=onboard-20261021-1"></script>
+  <script src="/assets/pawonboard.js?v=onboard-20261021-1"></script>
+  <script src="/assets/mobile-ui.js?v=reference-20261021-7"></script>
   <script src="/assets/pawtrail.js?v=reference-20261016-1"></script>
   <script src="/assets/offline-queue.js?v=offline-20261017-1"></script>
   <script src="/assets/admin-console.js?v=admin-20261017-1"></script>
@@ -501,7 +528,7 @@
   <div class="modal-backdrop" id="captureModal" role="dialog" aria-modal="true" aria-labelledby="captureTitle"><div class="modal"><h2 id="captureTitle">Spot a cat</h2><p id="captureHelp">Pawprint uses your camera and the capture-time location. The exact coordinate stays private; only an approximate area can appear on the map.</p><div class="capture-preview" id="capturePreview"><video id="cameraVideo" autoplay playsinline muted hidden style="width:100%;height:100%;object-fit:cover;border-radius:20px"></video><canvas id="captureCanvas" hidden></canvas><svg id="cameraFallback" viewBox="0 0 80 80" fill="none"><path d="m18 39 3-22 17 11h4l17-11 3 22v18c0 7-12 13-22 13S18 64 18 57V39Z" fill="#171717"/><circle cx="32" cy="43" r="3" fill="#FFB815"/><circle cx="48" cy="43" r="3" fill="#FFB815"/><path d="M32 55c4 3 12 3 16 0" stroke="#FFB815" stroke-width="3" stroke-linecap="round"/></svg></div><div class="capture-details" id="captureDetails" hidden><label for="sightingDescription">What did you notice?</label><textarea id="sightingDescription" maxlength="280" minlength="8" placeholder="e.g. Calm orange cat resting near the shaded walkway." required></textarea><div class="capture-detail-row"><span>Public map uses an approximate area.</span><select id="sightingVisibility" aria-label="Pin visibility"><option value="public">Public map pin</option><option value="friends">Friends only</option><option value="private">Private Journal only</option></select></div><small class="capture-safety-note">After capture, public pins wait 5 minutes and expire after 24 hours. You can delete your own pin anytime.</small></div><div class="modal-actions"><button class="btn btn-light btn-small" data-close-modal>Not now</button><button class="btn btn-amber btn-small" id="confirmCapture">Start camera</button></div></div></div><div class="toast" id="toast" role="status"></div>
   <script>
     const body=document.body,modal=document.getElementById('captureModal'),toast=document.getElementById('toast'),video=document.getElementById('cameraVideo'),canvas=document.getElementById('captureCanvas'),fallback=document.getElementById('cameraFallback'),captureHelp=document.getElementById('captureHelp'),confirmButton=document.getElementById('confirmCapture');let toastTimer,mediaStream=null,captureLocation=null,captureSessionId=null,idempotencyKey=null,lastSightingId=null;
-    window.pawprintAuthGate=window.pawprintAuthGate||{ready:false,queue:[]};function hideToast(){clearTimeout(toastTimer);toast.classList.remove('show');toast.setAttribute('aria-hidden','true')}function showApp(){if(!window.pawprintAuthGate.ready){window.pawprintAuthGate.queue.push(showApp);return}if(!window.pawprintSession){window.pawprintOpenAuth?.('login');return}body.classList.add('is-app');location.hash='app';scrollTo({top:0,behavior:'smooth'});loadDashboard()}window.addEventListener('pawprint-authenticated',event=>{if(event.detail?.continueToApp&&!window.pawprintDemoMode)showApp()});function showLanding(){hideToast();stopCamera();body.classList.remove('is-app');location.hash='top';scrollTo({top:0,behavior:'smooth'})}function notify(msg){clearTimeout(toastTimer);toast.textContent=msg;toast.setAttribute('aria-hidden','false');toast.classList.remove('show');requestAnimationFrame(()=>toast.classList.add('show'));toastTimer=setTimeout(hideToast,3300)}
+    window.pawprintAuthGate=window.pawprintAuthGate||{ready:false,queue:[]};function hideToast(){clearTimeout(toastTimer);toast.classList.remove('show');toast.setAttribute('aria-hidden','true')}function startPawOnboarding(){if(window.pawOnboardPromise)return window.pawOnboardPromise;const dark=document.documentElement.dataset.theme==='dark'||document.body.classList.contains('dark-mode');window.pawOnboardPromise=Promise.resolve(window.pawLaunchPromise).catch(()=>{}).then(()=>window.PawOnboard?.show({once:true,lang:'en',dark}));return window.pawOnboardPromise}function showApp(){if(!window.pawprintAuthGate.ready){window.pawprintAuthGate.queue.push(showApp);return}if(!window.pawprintSession){window.pawprintOpenAuth?.('login');return}body.classList.add('is-app');location.hash='app';scrollTo({top:0,behavior:'smooth'});loadDashboard();startPawOnboarding()}window.addEventListener('pawprint-authenticated',event=>{if(event.detail?.continueToApp&&!window.pawprintDemoMode)showApp()});function showLanding(){hideToast();stopCamera();body.classList.remove('is-app');location.hash='top';scrollTo({top:0,behavior:'smooth'})}function notify(msg){clearTimeout(toastTimer);toast.textContent=msg;toast.setAttribute('aria-hidden','false');toast.classList.remove('show');requestAnimationFrame(()=>toast.classList.add('show'));toastTimer=setTimeout(hideToast,3300)}
     async function api(path,options={}){const response=await fetch(path,{credentials:'include',signal:AbortSignal.timeout(15000),...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'REQUEST_FAILED');return data}
     async function loadDashboard(){try{const data=await api('/api/dashboard');window.pawprintDashboard=data;const sightings=data.sightings||[];if(sightings[0])lastSightingId=sightings[0].id;const streak=document.getElementById('streakMetric'),spotted=document.getElementById('spottedMetric'),xp=document.getElementById('xpMetric'),goal=document.getElementById('dailyGoalMetric'),goalProgress=document.getElementById('dailyGoalProgress'),collectionProgress=document.getElementById('collectionProgress');if(streak)streak.textContent=String(data.streak?.current||0);if(spotted)spotted.textContent=String(data.journal?.unique||0).padStart(2,'0');if(xp)xp.textContent=String(data.xp||0);const todayCount=Number(data.today?.count??data.dailyCats??(data.today?.validated?1:0)),todayTarget=Number(data.today?.target||1);if(goal)goal.textContent=`${todayCount} / ${todayTarget}${todayCount>=todayTarget?' done':''}`;if(goalProgress)goalProgress.style.width=`${Math.min(100,Math.round((todayCount/Math.max(1,todayTarget))*100))}%`;if(collectionProgress)collectionProgress.style.width=`${Math.min(100,Math.round((Number(data.journal?.unique||0)/20)*100))}%`;window.PawprintUI?.updateStreak(data);return data}catch(error){const streak=document.getElementById('streakMetric'),spotted=document.getElementById('spottedMetric'),xp=document.getElementById('xpMetric'),goal=document.getElementById('dailyGoalMetric');if(streak)streak.textContent='—';if(spotted)spotted.textContent='—';if(xp)xp.textContent='—';if(goal)goal.textContent='Unavailable';if(error.message==='AUTH_REQUIRED')notify('Sign in to sync your Journal and map.');else notify('Live dashboard data is unavailable right now.');return {sightings:[]}}}
     function stopCamera(){if(mediaStream){mediaStream.getTracks().forEach(track=>track.stop());mediaStream=null}video.hidden=true;fallback.hidden=false;captureSessionId=null;idempotencyKey=null;confirmButton.dataset.ready='';confirmButton.textContent='Start camera';captureHelp.textContent='Pawprint uses your camera and the capture-time location. The exact coordinate stays private; only an approximate area can appear on the map.'}
@@ -516,7 +543,7 @@
     const originalLoadDashboard=window.loadDashboard;window.loadDashboard=async function(){await originalLoadDashboard();try{const data=await api('/api/sightings');renderLiveMap(data.sightings||[])}catch(error){}};
   </script>
   <script>
-    const prefersReducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;document.querySelectorAll('a[href^="#"]').forEach(link=>link.addEventListener('click',event=>{const hash=link.getAttribute('href');if(!hash||hash==='#'||hash==='#app')return;const target=document.querySelector(hash);if(!target)return;event.preventDefault();target.scrollIntoView({behavior:prefersReducedMotion?'auto':'smooth',block:'start'});history.pushState(null,'',hash)}));
+    const prefersReducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;document.querySelectorAll('a[href^="#"]').forEach(link=>link.addEventListener('click',event=>{const hash=link.getAttribute('href');if(!hash||hash==='#'||hash==='#app')return;const target=document.querySelector(hash);if(!target)return;event.preventDefault();target.scrollIntoView({behavior:prefersReducedMotion()?'auto':'smooth',block:'start'});history.pushState(null,'',hash)}));
   </script>
   <script>
     renderLiveMap=function(sightings){const map=document.querySelector('.app-map');if(!map)return;map.querySelectorAll('.live-pin,.map-info').forEach(node=>node.remove());const fallbackPins=map.querySelectorAll('.mini-pin:not(.live-pin)');fallbackPins.forEach(pin=>pin.hidden=Boolean(sightings.length));if(!sightings.length)return;const latitudes=sightings.map(item=>item.area.latitude),longitudes=sightings.map(item=>item.area.longitude),minLat=Math.min(...latitudes),maxLat=Math.max(...latitudes),minLon=Math.min(...longitudes),maxLon=Math.max(...longitudes),latSpan=Math.max(maxLat-minLat,.001),lonSpan=Math.max(maxLon-minLon,.001),info=document.createElement('div');info.className='map-info';info.innerHTML='<strong></strong><small class="map-area">Approximate public area · exact location hidden</small><small class="map-time"></small><small class="map-expiry"></small>';map.appendChild(info);const infoTitle=info.querySelector('strong'),infoTime=info.querySelector('.map-time'),infoExpiry=info.querySelector('.map-expiry');sightings.slice(0,60).forEach(item=>{const pin=document.createElement('button');pin.type='button';pin.className=`mini-pin live-pin${item.emergency?' emergency':''}`;pin.title=item.emergency?'Emergency Care Flag':'Verified pawprint';pin.setAttribute('aria-label',item.emergency?'Emergency Care Flag marker':'Verified pawprint marker');pin.style.setProperty('--pin-x',`${12+((item.area.longitude-minLon)/lonSpan)*76}%`);pin.style.setProperty('--pin-y',`${22+(1-(item.area.latitude-minLat)/latSpan)*58}%`);pin.innerHTML='<i></i>';pin.addEventListener('click',()=>{infoTitle.textContent=item.emergency?'Emergency Care Flag':(item.catType||'Verified pawprint');infoTime.textContent=`Captured ${new Date(item.capturedAt).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}`;infoExpiry.textContent=`Public pin expires ${new Date(item.expiresAt).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}`;infoExpiry.className=item.emergency?'map-expiry emergency-copy':'map-expiry';info.classList.add('is-open')});map.appendChild(pin)})};
@@ -592,10 +619,10 @@
       const journalEntryMarkup=entry=>{const cat=String(entry.catType||'').toLowerCase();const icon=cat.includes('tuxedo')?'🐈‍⬛':'🐈';return `<button class="entry-row entry-row-button" type="button" data-journal-entry="${escapeHtml(entry.id||entry.sightingId||'')}"><span class="entry-icon">${icon}</span><span class="entry-copy"><strong>${escapeHtml(entry.catType||'Unclassified cat')}</strong><small>${formatDate(entry.spottedAt)} · ${formatVisibility(entry.visibility)}</small></span>${entry.firstSpotted?'<span class="entry-badge first">First found</span>':'<span class="entry-badge">Logged</span>'}</button>`;};
       const journalDetailMarkup=entry=>{const cat=String(entry.catType||'').toLowerCase();const icon=cat.includes('tuxedo')?'🐈‍⬛':'🐈';const classification=[entry.catBreed,entry.coatType].filter(Boolean).join(' · ');const photoUrl=String(entry.photoUrl||'');const photoMarkup=photoUrl?`<img class="journal-detail-photo" src="${escapeHtml(photoUrl)}" alt="Saved photo of ${escapeHtml(entry.catType||'cat')}" loading="lazy"><div class="journal-detail-photo-fallback" hidden aria-hidden="true">${icon}</div>`:`<div class="journal-detail-photo-fallback" aria-label="No saved photo">${icon}</div>`;return `<div class="journal-detail-backdrop" id="journalDetailModal" role="presentation"><section class="journal-detail-modal" role="dialog" aria-modal="true" aria-labelledby="journalDetailTitle"><div class="journal-detail-head"><div><span class="journal-detail-kicker">Saved in your Cat Journal</span><h2 id="journalDetailTitle">${escapeHtml(entry.catType||'Unclassified cat')}</h2></div><button class="journal-detail-close" type="button" data-journal-close aria-label="Close cat details">×</button></div><div class="journal-detail-photo-wrap">${photoMarkup}<span class="journal-detail-photo-badge">Saved cat photo</span></div><div class="journal-detail-cat"><span class="journal-detail-icon" aria-hidden="true">${icon}</span><span><strong>${classification?escapeHtml(classification):'Verified cat sighting'}</strong><small>${formatDate(entry.spottedAt)} · ${formatVisibility(entry.visibility)}</small></span></div><dl class="journal-detail-meta"><div><dt>Approximate location</dt><dd>${escapeHtml(entry.locationLabel||'Approximate area · exact location hidden')}</dd></div><div><dt>What you noticed</dt><dd class="journal-detail-description">${escapeHtml(entry.description||'No description was added for this sighting.')}</dd></div></dl><div class="journal-detail-actions"><button class="btn btn-dark" type="button" data-journal-close>Close details</button></div></section></div>`;};
       function journalMarkup(entries){const filtered=window.PawprintUI.filterEntries(entries,journalFilter);journalPage=Math.min(journalPage,Math.max(0,Math.ceil(filtered.length/5)-1));return window.PawprintUI.journal(entries,journalFilter,journalPage);}
-      function careMarkup(flags){const rows=flags.length?flags.map(flag=>`<div class="flag-row"><span class="care-symbol">⚑</span><span><strong>${escapeHtml(formatKind(flag.kind))}</strong><small>${escapeHtml(flag.catType||'Cat sighting')} · ${formatDate(flag.createdAt)}</small></span><span class="status-pill">${escapeHtml(flag.status||'open')}</span></div>`).join(''):'<div class="empty-state">No Care Flags yet. If something feels off, you can raise a gentle community review.</div>';return `<div class="screen-panel"><div class="care-hero"><div><span class="eyebrow" style="color:#c7c9cd">Care stays free</span><h2>Small signals can lead to safer care.</h2><p>Care Flags are observations, not diagnoses. Share only what you can safely see and never approach an animal in danger.</p></div><span class="care-mark">⚑</span></div><div class="panel-intro"><div><h2>What would you like to flag?</h2><p>Choose a concern, then attach it to your latest sighting. A real submission requires a signed-in account.</p></div></div><div class="care-grid"><button class="care-option" data-care-kind="thin"><span class="care-symbol">♡</span><strong>Looks underweight</strong><small>Body condition looks concerning from a distance.</small></button><button class="care-option" data-care-kind="injured"><span class="care-symbol">＋</span><strong>May be injured</strong><small>You noticed a possible injury or difficulty moving.</small></button><button class="care-option" data-care-kind="lone_kitten"><span class="care-symbol">•</span><strong>Lone kitten</strong><small>A young kitten appears to be alone.</small></button><button class="care-option" data-care-kind="other"><span class="care-symbol">⚑</span><strong>Something else</strong><small>Share a non-diagnostic note for review.</small></button></div><div class="data-card"><div class="panel-intro"><div><h3>Your open flags</h3></div><span class="entry-badge">Community review</span></div><div class="flag-list" id="flagList">${rows}</div></div></div>`;}
+      function careMarkup(flags){const rows=flags.length?flags.map(flag=>`<div class="flag-row"><span class="care-symbol">⚑</span><span><strong>${escapeHtml(formatKind(flag.kind))}</strong><small>${escapeHtml(flag.catType||'Cat sighting')} · ${formatDate(flag.createdAt)}</small></span><span class="status-pill">${escapeHtml(flag.status||'open')}</span></div>`).join(''):'<div class="empty-state"><strong>No open Care Flags</strong><span>If something feels off, raise a gentle community review.</span><button class="btn btn-light btn-small" type="button" data-care-refresh>Refresh flags</button></div>';return `<div class="screen-panel"><div class="care-hero"><div><span class="eyebrow" style="color:#c7c9cd">Care stays free</span><h2>Small signals can lead to safer care.</h2><p>Care Flags are observations, not diagnoses. Share only what you can safely see and never approach an animal in danger.</p></div><span class="care-mark">⚑</span></div><div class="panel-intro"><div><h2>What would you like to flag?</h2><p>Choose a concern, then attach it to your latest sighting. A real submission requires a signed-in account.</p></div></div><div class="care-grid"><button class="care-option" data-care-kind="thin"><span class="care-symbol">♡</span><strong>Looks underweight</strong><small>Body condition looks concerning from a distance.</small></button><button class="care-option" data-care-kind="injured"><span class="care-symbol">＋</span><strong>May be injured</strong><small>You noticed a possible injury or difficulty moving.</small></button><button class="care-option" data-care-kind="lone_kitten"><span class="care-symbol">•</span><strong>Lone kitten</strong><small>A young kitten appears to be alone.</small></button><button class="care-option" data-care-kind="other"><span class="care-symbol">⚑</span><strong>Something else</strong><small>Share a non-diagnostic note for review.</small></button></div><div class="data-card"><div class="panel-intro"><div><h3>Your open flags</h3></div><span class="entry-badge">Community review</span></div><div class="flag-list" id="flagList">${rows}</div></div></div>`;}
       // Profile rendering is defined once below.
       const profileMedalSvg=(medal,index=0)=>window.PawprintUI.medal(medal);
-      const profileAchievementsMarkup=progress=>{if(progress===null)return '<section class="profile-achievements"><p>Your medals could not be loaded.</p><button class="btn btn-light" data-goto-screen="profile">Retry medals</button></section>';if(!progress)return '<section class="profile-achievements" aria-label="Your medals"><div class="profile-achievement-head"><div><h3>Medals</h3><p>Your verified progress will appear here.</p></div></div><div class="profile-achievement-empty"><span data-pawloader-slot="profile-medals"><paw-loader variant="paws" size="md" label="Loading your medals"></paw-loader></span><span>Checking your XP and earned medals…</span></div></section>';const xp=Number(progress.xp||0),level=Math.max(1,(progress.medals||[]).filter(m=>m.earned).length),base=0,target=Math.max(1,Number(progress.nextMedal?.xpRequired||progress.xp||1)),percent=Math.min(100,Math.max(0,Math.round(((xp-base)/(target-base))*100))),medals=Array.isArray(progress.medals)?progress.medals:[],earned=medals.filter(medal=>medal.earned),next=progress.nextMedal||medals.find(medal=>!medal.earned),streak=Number(progress.streak?.current||0),streakLabel=streak?`${streak} day${streak===1?'':'s'} glowing`:'Start your streak today';const medalMarkup=medals.length?medals.map((medal,index)=>`<div class="profile-medal-item ${medal.earned?'earned':'locked'}" title="${escapeHtml(medal.description||'Keep spotting safely.')}" tabindex="0"><div class="profile-medal-art">${profileMedalSvg(medal,index)}</div>${medal.earned?'<span class="profile-medal-check" aria-label="Earned">✓</span>':''}<strong>${escapeHtml(medal.title||'Pawprint medal')}</strong><small>${medal.earned?'Earned':`${Number(medal.xpRequired||0)} XP`}</small></div>`).join(''):'<div class="profile-achievement-empty">No medals are available yet. Complete a verified sighting to begin.</div>';return `<section class="profile-achievements" aria-label="Your medals and XP"><div class="profile-achievement-head"><div><h3>Medals</h3><p>Small, safe steps add up to a brighter Pawprint.</p></div><span class="profile-earned-count">${earned.length} earned</span></div><div class="profile-progress-card"><div class="profile-progress-top"><span>Progress · Tier ${level}</span><strong>${escapeHtml(streakLabel)}</strong></div><div class="profile-progress-main"><strong class="profile-xp-total">${xp} XP</strong>${next?`<span class="profile-next-medal">${Math.max(0,Number(next.xpRequired||0)-xp)} XP to ${escapeHtml(next.title||'the next medal')}</span>`:'<span class="profile-next-medal">All medals earned</span>'}</div><div class="profile-progress-bar" aria-label="${percent}% to the next tier"><span style="width:${percent}%"></span></div><div class="profile-progress-foot"><span>Tier ${level}</span><strong>${Math.max(0,target-xp)} XP to next tier</strong></div></div><div class="profile-medal-grid">${medalMarkup}</div></section>`;};
+      const profileAchievementsMarkup=progress=>{if(progress===null)return '<section class="profile-achievements"><p>Your medals could not be loaded.</p><button class="btn btn-light" data-goto-screen="profile">Retry medals</button></section>';if(!progress)return '<section class="profile-achievements" aria-label="Your medals"><div class="profile-achievement-head"><div><h3>Medals</h3><p>Your verified progress will appear here.</p></div></div><div class="profile-achievement-empty"><span data-pawloader-slot="profile-medals"><paw-loader variant="paws" size="md" label="Loading your medals"></paw-loader></span><span>Checking your XP and earned medals…</span></div></section>';const xp=Number(progress.xp||0),level=Math.max(1,(progress.medals||[]).filter(m=>m.earned).length),base=0,target=Math.max(1,Number(progress.nextMedal?.xpRequired||progress.xp||1)),percent=Math.min(100,Math.max(0,Math.round(((xp-base)/(target-base))*100))),medals=Array.isArray(progress.medals)?progress.medals:[],earned=medals.filter(medal=>medal.earned),next=progress.nextMedal||medals.find(medal=>!medal.earned),streak=Number(progress.streak?.current||0),streakLabel=streak?`${streak} day${streak===1?'':'s'} glowing`:'Start your streak today';const medalMarkup=medals.length?medals.map((medal,index)=>`<div class="profile-medal-item ${medal.earned?'earned':'locked'}" title="${escapeHtml(medal.description||'Keep spotting safely.')}" tabindex="0" aria-label="${escapeHtml(medal.title||'Pawprint medal')}, ${medal.earned?'earned':'locked'}"><div class="profile-medal-art">${profileMedalSvg(medal,index)}</div>${medal.earned?'<span class="profile-medal-check" aria-label="Earned">✓</span>':'<span class="profile-medal-lock" aria-label="Locked">Locked</span>'}<strong>${escapeHtml(medal.title||'Pawprint medal')}</strong><small>${medal.earned?'Earned':`${Number(medal.xpRequired||0)} XP`}</small></div>`).join(''):'<div class="profile-achievement-empty">No medals are available yet. Complete a verified sighting to begin.</div>';return `<section class="profile-achievements" aria-label="Your medals and XP"><div class="profile-achievement-head"><div><h3>Medals</h3><p>Small, safe steps add up to a brighter Pawprint.</p></div><span class="profile-earned-count">${earned.length} earned</span></div><div class="profile-progress-card"><div class="profile-progress-top"><span>Progress · Tier ${level}</span><strong>${escapeHtml(streakLabel)}</strong></div><div class="profile-progress-main"><strong class="profile-xp-total">${xp} XP</strong>${next?`<span class="profile-next-medal">${Math.max(0,Number(next.xpRequired||0)-xp)} XP to ${escapeHtml(next.title||'the next medal')}</span>`:'<span class="profile-next-medal">All medals earned</span>'}</div><div class="profile-progress-bar" aria-label="${percent}% to the next tier"><span style="width:${percent}%"></span></div><div class="profile-progress-foot"><span>Tier ${level}</span><strong>${Math.max(0,target-xp)} XP to next tier</strong></div></div><div class="profile-medal-grid">${medalMarkup}</div></section>`;};
       // Profile rendering is defined once below.
       function mount(markup,nextTitle){dashboard.innerHTML=markup;title.textContent=nextTitle;navSync();hideToast();window.PawprintUI.mount(activeScreen);wirePanel();}
       async function go(screen){activeScreen=screen;hideToast();const currentUser=window.pawprintProfile||null;if(screen==='home'){mount(homeMarkup(),screenTitles.home);if(window.loadDashboard)window.loadDashboard();return;}if(screen==='journal'){mount(journalMarkup(journalEntries),screenTitles.journal);loadJournal();return;}if(screen==='care'){mount(careMarkup(careFlags),screenTitles.care);loadCareFlags();return;}mount(profileMarkup(currentUser),screenTitles.profile);loadProfile();}
@@ -603,7 +630,7 @@
       async function loadCareFlags(){try{const data=await api('/api/care-flags');careFlags=data.flags||[];if(activeScreen==='care')mount(careMarkup(careFlags),screenTitles.care);}catch(error){careFlags=[];if(activeScreen==='care')mount(careMarkup([]),screenTitles.care);if(error.message==='AUTH_REQUIRED')notify('Sign in to see your Care Flags.');else notify('Care Flags are unavailable right now.');}}
       async function loadProfile(){try{const [data,progress]=await Promise.all([api('/api/me'),api('/api/progress').catch(()=>null)]);window.pawprintProfile=data.user;window.pawprintProgress=progress;if(activeScreen==='profile')mount(profileMarkup(data.user,progress),screenTitles.profile);}catch(error){if(error.message==='AUTH_REQUIRED')notify('Sign in to save profile changes.');if(activeScreen==='profile')mount(profileMarkup(window.pawprintProfile||{},null),screenTitles.profile);}}
       function profileMarkup(user,progress){const profile=user||{};const displayName=profile.display_name||'Pawprint spotter';return `<div class="screen-panel profile-screen-panel"><section class="profile-identity-panel"><article class="profile-card dark profile-identity-card"><div class="profile-avatar">🐾</div><h2>${escapeHtml(displayName)}</h2><p>${escapeHtml(profile.email||'Your account details stay private.')}</p></article></section>${profileAchievementsMarkup(progress)}<section class="profile-settings-card"><div class="profile-settings-head"><div><h3>Privacy controls</h3><p>Choose what stays private while approximate map protection remains on.</p></div></div><div class="profile-privacy-panel"><div class="profile-privacy-row"><span>Friends can find me</span><button class="toggle on" type="button" data-toggle="friends" aria-label="Allow friends to find me" aria-pressed="true"></button></div><div class="profile-privacy-row"><span>Care reminders</span><button class="toggle on" type="button" data-toggle="reminders" aria-label="Receive care reminders" aria-pressed="true"></button></div><div class="profile-privacy-row"><span>Approximate map only <small class="privacy-always-on">always on for safety</small></span><button class="toggle on" type="button" data-toggle="map" aria-label="Approximate map protection is always on" aria-pressed="true" disabled></button></div></div><article class="profile-card profile-details-card"><div class="panel-intro"><div><span class="eyebrow">Your details</span><h2>Keep your Pawprint personal.</h2><p>Only your nickname is designed for community surfaces. Exact age, email, and location remain private.</p></div></div><form id="profileForm" class="form-grid"><div class="form-field full"><label for="profileName">Nickname</label><input id="profileName" name="displayName" value="${escapeHtml(profile.display_name||'')}" placeholder="How should Pawprint call you?"></div><div class="form-field"><label for="profileTimezone">Streak time zone</label><select id="profileTimezone" name="timeZone"><option value="Asia/Manila" ${(profile.time_zone||'Asia/Manila')==='Asia/Manila'?'selected':''}>Asia/Manila</option><option value="Asia/Tokyo" ${(profile.time_zone||'')==='Asia/Tokyo'?'selected':''}>Asia/Tokyo</option><option value="UTC" ${(profile.time_zone||'')==='UTC'?'selected':''}>UTC</option><option value="America/Los_Angeles" ${(profile.time_zone||'')==='America/Los_Angeles'?'selected':''}>America/Los Angeles</option></select></div><div class="form-field"><label for="profileLanguage">Language</label><select id="profileLanguage" name="language"><option value="en" ${(profile.language||'en')==='en'?'selected':''}>English</option><option value="fil" ${profile.language==='fil'?'selected':''}>Filipino</option><option value="es" ${profile.language==='es'?'selected':''}>Spanish</option><option value="ja" ${profile.language==='ja'?'selected':''}>Japanese</option></select></div><div class="form-field full"><button class="btn btn-dark" type="submit">Save profile changes</button></div></form><div class="panel-actions" style="margin-top:18px"><button class="btn btn-light" type="button" id="exportData">Download my data</button></div><div class="danger-zone"><strong>Account controls</strong><small>Deleting removes your photos, Cat Journal, and derived records. This cannot be undone.</small><button class="btn btn-small" style="background:#fff;color:#9a3329;border:1px solid #f0c4be" type="button" id="deleteAccount">Delete account</button></div></article></section></div>`;}
-      function wirePanel(){const capture=document.getElementById('captureBtn');if(capture)capture.addEventListener('click',()=>modal.classList.add('open'));const care=document.getElementById('careBtn');if(care)care.addEventListener('click',()=>go('care'));document.querySelectorAll('[data-care-kind]').forEach(button=>button.addEventListener('click',()=>submitCareFlag(button.dataset.careKind)));const form=document.getElementById('profileForm');if(form)form.addEventListener('submit',saveProfile);const exportButton=document.getElementById('exportData');if(exportButton)exportButton.addEventListener('click',exportData);const deleteButton=document.getElementById('deleteAccount');if(deleteButton)deleteButton.addEventListener('click',deleteAccount);}
+      function wirePanel(){const capture=document.getElementById('captureBtn');if(capture)capture.addEventListener('click',()=>modal.classList.add('open'));document.querySelectorAll('[data-open-capture]').forEach(button=>button.addEventListener('click',()=>modal.classList.add('open')));const care=document.getElementById('careBtn');if(care)care.addEventListener('click',()=>go('care'));document.querySelectorAll('[data-care-refresh]').forEach(button=>button.addEventListener('click',()=>{button.disabled=true;loadCareFlags();}));document.querySelectorAll('[data-care-kind]').forEach(button=>button.addEventListener('click',()=>submitCareFlag(button.dataset.careKind)));const form=document.getElementById('profileForm');if(form)form.addEventListener('submit',saveProfile);const exportButton=document.getElementById('exportData');if(exportButton)exportButton.addEventListener('click',exportData);const deleteButton=document.getElementById('deleteAccount');if(deleteButton)deleteButton.addEventListener('click',deleteAccount);}
       const renderJournalView=()=>{if(activeScreen==='journal')mount(journalMarkup(journalEntries),screenTitles.journal);};
       const closeJournalDetail=()=>{const modal=document.getElementById('journalDetailModal');if(!modal)return;modal.classList.remove('is-open');document.body.classList.remove('journal-modal-open');window.setTimeout(()=>modal.remove(),190);};
       const openJournalDetail=entry=>{if(!entry)return;closeJournalDetail();const holder=document.createElement('div');holder.innerHTML=journalDetailMarkup(entry);const modal=holder.firstElementChild;if(!modal)return;document.body.appendChild(modal);document.body.classList.add('journal-modal-open');const photo=modal.querySelector('.journal-detail-photo');const fallback=modal.querySelector('.journal-detail-photo-fallback');if(photo&&fallback)photo.addEventListener('error',()=>{photo.hidden=true;fallback.hidden=false;});requestAnimationFrame(()=>modal.classList.add('is-open'));};
@@ -690,7 +717,7 @@
         const list=document.getElementById('journalList');
         if(!list)return;
         list.replaceChildren();
-        if(!entries.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent='No pawprints yet. Your first validated sighting will appear here.';list.appendChild(empty);return;}
+        if(!entries.length){const empty=document.createElement('div');empty.className='empty-state';empty.innerHTML='<strong>No pawprints yet</strong><span>Your first validated sighting will appear here.</span><button class="btn btn-amber btn-small" type="button" data-open-capture>Spot a cat</button>';list.appendChild(empty);return;}
         entries.slice(0,2).forEach(entry=>{const row=document.createElement('div');row.className='journal-item';const icon=document.createElement('span');icon.className='journal-cat';icon.textContent=String(entry.catType||'').toLowerCase().includes('tuxedo')?'🐈‍⬛':'🐈';const copy=document.createElement('span');const name=document.createElement('strong');name.textContent=entry.catType||'Unclassified cat';const date=document.createElement('small');date.textContent=`${formatJournalDate(entry.spottedAt)} · ${entry.firstSpotted?'first spot':'logged'}`;copy.append(name,date);row.append(icon,copy);list.appendChild(row);});
       };
       const refreshHomeJournal=async()=>{try{const response=await fetch('/api/journal',{credentials:'include',signal:AbortSignal.timeout(15000)});if(!response.ok)throw new Error('JOURNAL_UNAVAILABLE');const data=await response.json();renderHomeJournal(data.entries||[]);}catch{const list=document.getElementById('journalList');if(list)list.innerHTML='<div class="empty-state">Pawprints could not be loaded.<br><button class="btn btn-light" data-goto-screen="home">Retry</button></div>';}};
@@ -698,7 +725,7 @@
       if(currentLoadDashboard)window.loadDashboard=async()=>{const result=await currentLoadDashboard();await refreshHomeJournal();return result;};
       const currentRenderMap=window.renderLiveMap;
       if(currentRenderMap)window.renderLiveMap=sightings=>{currentRenderMap(sightings);const map=document.querySelector('.app-map');if(!map)return;map.querySelectorAll('.mini-pin:not(.live-pin)').forEach(pin=>pin.remove());let empty=map.querySelector('.map-empty');if(!sightings.length){if(!empty){empty=document.createElement('span');empty.className='map-empty';empty.textContent='No public pawprints nearby yet';map.appendChild(empty);}}else if(empty)empty.remove();};
-      const refreshActualCare=async()=>{const list=document.getElementById('flagList');if(!list||list.dataset.actualChecked)return;list.dataset.actualChecked='1';try{const response=await fetch('/api/care-flags',{credentials:'include'});if(!response.ok)return;const data=await response.json();if(!(data.flags||[]).length){list.replaceChildren();const empty=document.createElement('div');empty.className='empty-state';empty.textContent='No Care Flags yet. If something feels off, you can raise a gentle community review.';list.appendChild(empty);}}catch{}};
+      const refreshActualCare=async()=>{const list=document.getElementById('flagList');if(!list||list.dataset.actualChecked)return;list.dataset.actualChecked='1';try{const response=await fetch('/api/care-flags',{credentials:'include'});if(!response.ok)return;const data=await response.json();if(!(data.flags||[]).length){list.replaceChildren();const empty=document.createElement('div');empty.className='empty-state';empty.innerHTML='<strong>No open Care Flags</strong><span>If something feels off, raise a gentle community review.</span><button class="btn btn-light btn-small" type="button" data-care-refresh>Refresh flags</button>';list.appendChild(empty);empty.querySelector('[data-care-refresh]')?.addEventListener('click',()=>{empty.querySelector('button').disabled=true;list.dataset.actualChecked='';refreshActualCare();});}}catch{}};
       const dashboard=document.getElementById('dashboard');
       if(dashboard)new MutationObserver(()=>{refreshActualCare()}).observe(dashboard,{childList:true,subtree:true});
       refreshHomeJournal();refreshActualCare();
@@ -780,7 +807,8 @@
             if(result.status==='accepted'){
               const confidence=Number(result.validation?.catConfidence);const suffix=Number.isFinite(confidence)?' · '+Math.round(confidence*100)+'%':'';
               window.PawprintUI.captureStatus('accepted','Cat detected · '+(result.catType||'Cat')+suffix);
-              tell(visibility.value==='public'?'Cat verified. Your approximate pin appears after 5 minutes.':'Cat verified and saved to your Journal.');
+              const xpText=Number(result.xp||0)>0?` +${Number(result.xp)} XP`:'';const streakCurrent=Number(result.streak?.current||result.streakCurrent||0);const streakText=streakCurrent?` Your ${streakCurrent}-day streak is safe.`:'';
+              tell(visibility.value==='public'?`Cat verified and saved${xpText}. Your approximate pin appears after 5 minutes.${streakText}`:`Cat verified and saved to your Journal${xpText}.${streakText}`);
               window.loadDashboard?.();setTimeout(()=>{if(token===generation)closeModal();},900);
             }else{
               const message=result.status==='needs_review'?'Needs a safety review. No XP or public pin yet.':(result.reason||'This capture was not accepted. Try another clear cat photo.');
@@ -889,7 +917,7 @@
   <script>
     (()=>{
       const form=document.getElementById('waitlistForm'),status=document.getElementById('waitlistStatus');
-      if(form&&status){form.addEventListener('submit',async event=>{event.preventDefault();const submit=form.querySelector('button[type="submit"]');const params=new URLSearchParams(location.search);const payload={email:form.email.value,platformInterest:form.platformInterest.value,source:params.get('utm_source')||'landing'};submit.disabled=true;submit.textContent='Reserving…';try{const response=await fetch('/api/waitlist',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'WAITLIST_FAILED');status.textContent='You’re on the early-access whitelist — we’ll use this list for first-access planning and launch updates.';form.reset()}catch(error){status.textContent=error.message==='INVALID_EMAIL'?'Enter a valid email address.':'Could not reserve your spot yet. Please try again.'}finally{submit.disabled=false;submit.textContent='Reserve my spot'}})}
+      if(form&&status){form.addEventListener('submit',async event=>{event.preventDefault();const submit=form.querySelector('button[type="submit"]');const params=new URLSearchParams(location.search);const payload={email:form.email.value,platformInterest:form.platformInterest.value,source:params.get('utm_source')||'landing'};const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);const releaseSubmit=()=>{clearTimeout(timeout);submit.disabled=false;submit.textContent=({ios:'iOS',android:'Android',ios_android:'iOS & Android'}[form.platformInterest.value]||'iOS & Android')==='iOS & Android'?'Get notified for iOS & Android':`Get notified for ${({ios:'iOS',android:'Android',ios_android:'iOS & Android'}[form.platformInterest.value]||'iOS & Android')}`};submit.disabled=true;submit.textContent='Reserving…';try{const response=await fetch('/api/waitlist',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'WAITLIST_FAILED');if(data.status==='already_subscribed'){status.textContent='You’re already on the Pawprint early-access list. Check your inbox for the confirmation email.'}else if(data.confirmationEmail==='sent'){status.textContent='You’re on the early-access list — a confirmation email is on its way.'}else{status.textContent='You’re on the early-access list. Your confirmation email is queued and may arrive shortly.'}try{form.reset()}catch{}releaseSubmit()}catch(error){status.textContent=error.name==='AbortError'?'The request is taking too long. Please try again.':error.message==='INVALID_EMAIL'?'Enter a valid email address.':'Could not reserve your spot yet. Please try again.'}finally{releaseSubmit()}})}
       const footer=document.querySelector('footer .footer-row');if(footer){footer.innerHTML='<span><b>Pawprint</b> · Spot cats. Leave a trace.</span><span class="footer-links"><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#contact">Contact</a><a href="https://www.linkedin.com/in/john-carlo-manalo-54582b171/" target="_blank" rel="noreferrer">LinkedIn</a></span>'}
     })();
   </script>
@@ -897,7 +925,7 @@
     (()=>{const platform=document.getElementById('waitlistPlatform');if(platform){platform.innerHTML='<option value="ios_android">iOS + Android</option><option value="ios">iOS</option><option value="android">Android</option>';}})();
   </script>
   <script>
-    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js?v=2').catch(() => {}));
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js?v=3').catch(() => {}));
   </script>
   <script>
     (() => {
@@ -924,7 +952,7 @@
       }, true);
     })();
   </script>
-  <script type="module" src="/assets/supabase-auth-gate.js?v=auth-lazy-start-20261016"></script>
+  <script type="module" src="/assets/supabase-auth-gate.js?v=public-demo-only-20261021"></script>
   <div class="share-modal" id="shareCardModal" aria-hidden="true">
     <div class="share-modal-backdrop" data-share-close></div>
     <section class="share-sheet" role="dialog" aria-modal="true" aria-labelledby="shareCardTitle">
@@ -974,22 +1002,58 @@
         .app-view{position:relative}
         html.demo-requested .app-shell, .demo-mode .app-shell{filter:blur(8px) saturate(.72);opacity:.72;pointer-events:none;user-select:none}
         html.demo-requested .app-view:before, .demo-mode .app-view:before{content:'';position:absolute;inset:0;z-index:3;background:rgba(241,242,244,.24);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none}
-        .demo-mode .auth-backdrop{display:none!important}
+        .demo-mode .auth-backdrop{z-index:1000}
+        body.demo-auth-open .auth-backdrop{background:#151515;backdrop-filter:none;-webkit-backdrop-filter:none}
+        body.demo-auth-open .demo-lock-layer{visibility:hidden;pointer-events:none}
+        body.demo-auth-open .app-view:before{background:rgba(21,21,21,.5);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
         .demo-lock-layer{position:absolute;inset:18px;z-index:4;display:grid;place-items:center;padding:24px;pointer-events:auto}
         .demo-lock-card{position:relative;max-width:430px;padding:30px;border:1px solid rgba(23,23,23,.12);border-radius:28px;background:rgba(255,255,255,.94);box-shadow:0 24px 70px rgba(23,23,23,.18);text-align:center;overflow:hidden}
         .demo-lock-card:before,.demo-lock-card:after{position:absolute;content:'🐾';font-size:54px;opacity:.1;transform:rotate(-18deg)}
         .demo-lock-card:before{left:-4px;top:8px}.demo-lock-card:after{right:-2px;bottom:6px;transform:rotate(18deg)}
         .demo-lock-paws{display:flex;justify-content:center;gap:14px;margin-bottom:14px;font-size:30px;color:var(--amber,#ffb815)}
-        .demo-lock-card .eyebrow{display:block;margin-bottom:8px}.demo-lock-card h2{margin:0 0 10px;font-size:clamp(1.6rem,4vw,2.2rem)}
+        .demo-lock-card .eyebrow{display:block;margin-bottom:8px;color:#73777e}.demo-lock-card h2{margin:0 0 10px;color:#171717!important;font-size:clamp(1.6rem,4vw,2.2rem)}
         .demo-lock-card p{margin:0 auto 16px;max-width:34ch;color:#73777e;line-height:1.55}
         .demo-preview-accounts{position:relative;z-index:1;margin:18px 0 20px;padding-top:16px;border-top:1px solid rgba(23,23,23,.1);text-align:left}
         .demo-preview-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#73777e;font-size:.66rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase}
         .demo-preview-heading span:last-child{padding:5px 8px;border:1px solid rgba(110,75,0,.2);border-radius:999px;background:#fff8e7;color:#6e4b00;letter-spacing:.03em;text-transform:none}
         .demo-profile-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
         .demo-profile-card{min-width:0;padding:10px 8px;border:1px solid #e2e3e5;border-radius:16px;background:rgba(250,250,250,.82);box-shadow:0 5px 12px rgba(23,23,23,.05)}
+        .demo-profile-card{width:100%;font:inherit;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+        .demo-profile-card:hover,.demo-profile-card:focus-visible{transform:translateY(-3px);border-color:var(--amber,#ffb815);box-shadow:0 9px 18px rgba(23,23,23,.12)}
+        .demo-profile-card:focus-visible{outline:3px solid var(--amber,#ffb815);outline-offset:3px}
         .demo-profile-avatar{display:grid;place-items:center;width:44px;height:44px;margin:0 auto 7px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 1px rgba(23,23,23,.08)}
         .demo-profile-avatar svg{width:38px;height:38px;display:block}.demo-profile-card strong,.demo-profile-card small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}.demo-profile-card strong{color:#171717;font-size:.72rem}.demo-profile-card small{margin-top:3px;color:#7b7e84;font-size:.59rem;line-height:1.35}.demo-profile-stat{margin-top:7px;color:#6e4b00!important;font-weight:850}
         .demo-lock-card .btn{position:relative;z-index:1}
+        .demo-demo-hint{margin:0 0 4px!important;color:#6e4b00!important;font-size:.74rem!important;font-weight:800}
+        .demo-profile-view{width:min(100%,620px);max-height:calc(100vh - 28px);overflow:auto;padding:18px;border:2px solid var(--ink,#171717);border-radius:28px;background:#171717;color:#fff;box-shadow:0 24px 70px rgba(23,23,23,.28);text-align:left}
+        .demo-prototype-view{width:min(100%,440px);height:min(calc(100vh - 28px),900px);display:flex;flex-direction:column;padding:12px;overflow:hidden}.demo-prototype-frame{display:block;flex:1;width:100%;min-height:0;border:0;border-radius:24px;background:#e9e6df}.demo-prototype-view .demo-app-bar{flex:none;margin-bottom:10px}
+        .demo-profile-view button{font:inherit}
+        .demo-app-bar,.demo-profile-heading,.demo-demo-tabs,.demo-demo-stat-row{display:flex;align-items:center;gap:10px}
+        .demo-app-bar{justify-content:space-between;margin-bottom:18px;color:#c9c9c9;font-size:.7rem;font-weight:900}
+        .demo-app-bar button,.demo-demo-back{border:1px solid #777;border-radius:999px;background:#242424;color:#fff;padding:7px 11px;cursor:pointer}
+        .demo-demo-badge{padding:5px 8px;border:1px solid #555;border-radius:999px;color:#ffcf53;font-size:.62rem}
+        .demo-profile-heading{padding:16px;border:1px solid #343434;border-radius:22px;background:#202020}
+        .demo-profile-heading .demo-profile-avatar{flex:0 0 60px;width:60px;height:60px;margin:0;background:#ffb815}
+        .demo-profile-heading .demo-profile-avatar svg{width:52px;height:52px}
+        .demo-profile-heading h2{margin:0;color:#fff;font-size:1.35rem;letter-spacing:-.05em}
+        .demo-profile-heading p{margin:4px 0 0;color:#aaa;font-size:.76rem}
+        .demo-demo-stat-row{margin:12px 0}
+        .demo-demo-stat{flex:1;padding:11px;border-radius:15px;background:#242424;text-align:center}
+        .demo-demo-stat strong,.demo-demo-stat small{display:block}.demo-demo-stat strong{color:#ffb815;font-size:1.18rem}.demo-demo-stat small{margin-top:2px;color:#aaa;font-size:.62rem}
+        .demo-demo-tabs{margin:12px 0;overflow:auto}
+        .demo-demo-tabs button{flex:1;min-width:70px;border:1px solid #555;border-radius:999px;background:transparent;color:#bbb;padding:8px 10px;font-size:.7rem;font-weight:900;cursor:pointer}
+        .demo-demo-tabs button[aria-selected=true]{border-color:#ffb815;background:#ffb815;color:#171717}
+        .demo-demo-panel{min-height:210px;padding:16px;border-radius:20px;background:#202020}
+        .demo-demo-panel h3{margin:0 0 12px;color:#fff;font-size:1rem}.demo-demo-panel p{margin:7px 0;color:#aaa;font-size:.78rem;line-height:1.5}
+        .demo-demo-map{position:relative;height:120px;margin:0 0 13px;overflow:hidden;border-radius:16px;background:#2c2d30}
+        .demo-demo-map:before{content:'';position:absolute;inset:0;background:linear-gradient(30deg,transparent 46%,#45464a 47%,#45464a 51%,transparent 52%),linear-gradient(150deg,transparent 48%,#3f4044 49%,#3f4044 52%,transparent 53%);background-size:120px 90px,150px 110px}
+        .demo-demo-pin{position:absolute;width:22px;height:22px;border:3px solid #171717;border-radius:50% 50% 50% 5px;background:#ffb815;transform:rotate(-45deg);box-shadow:0 0 0 6px rgba(255,184,21,.18)}
+        .demo-demo-pin:after{content:'';position:absolute;inset:6px;border-radius:50%;background:#171717}
+        .demo-demo-pin.one{left:23%;top:32%}.demo-demo-pin.two{left:68%;top:58%;background:#fff}
+        .demo-demo-list{display:grid;gap:8px}.demo-demo-list article{display:flex;align-items:center;justify-content:space-between;padding:10px 11px;border:1px solid #3b3b3b;border-radius:13px;background:#242424}.demo-demo-list strong{font-size:.76rem}.demo-demo-list small{color:#aaa;font-size:.65rem}
+        .demo-demo-care{padding:11px;border-left:3px solid #e55745;border-radius:10px;background:#292323}.demo-demo-care strong{display:block;color:#ff9d8d;font-size:.75rem}.demo-demo-care span{display:block;margin-top:3px;color:#bbb;font-size:.7rem}
+        .demo-demo-private{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #3a3a3a;color:#ddd;font-size:.76rem}.demo-demo-private:last-child{border-bottom:0}
+        @media (max-width:600px){.demo-profile-view{max-height:calc(100vh - 20px);padding:14px;border-radius:22px}.demo-profile-heading{padding:13px}.demo-demo-stat{padding:9px 5px}.demo-demo-stat strong{font-size:1rem}}
         @media (max-width:600px){.demo-lock-layer{inset:10px;padding:14px}.demo-lock-card{padding:24px 18px;border-radius:22px}.demo-preview-accounts{margin-top:14px}.demo-profile-card{padding:8px 5px}.demo-profile-avatar{width:39px;height:39px}.demo-profile-avatar svg{width:34px;height:34px}}
       `;
       document.head.appendChild(style);
@@ -1009,18 +1073,35 @@
         layer.setAttribute('role', 'dialog');
         layer.setAttribute('aria-label', 'Pawprint demo overview');
         const fakeProfiles = [
-          { avatar: 'cat-round', name: 'Mimi', level: 'Level 2', stat: '248 XP' },
-          { avatar: 'cat-bengal', name: 'Alley Scout', level: 'Level 3', stat: '18 spots' },
-          { avatar: 'cat-sphynx', name: 'Calico Friend', level: 'Level 1', stat: '1 care flag' }
+          { id: 'mimi', avatar: 'cat-round', name: 'Mimi', level: 'Level 2', stat: '248 XP', tagline: 'A steady spotter who keeps things gentle.', streak: '4', journal: '8', flags: '0', area: 'Alabang' },
+          { id: 'alley-scout', avatar: 'cat-bengal', name: 'Alley Scout', level: 'Level 3', stat: '18 spots', tagline: 'Knows the quiet corners and watches from a distance.', streak: '7', journal: '18', flags: '1', area: 'Makati' },
+          { id: 'calico-friend', avatar: 'cat-sphynx', name: 'Calico Friend', level: 'Level 1', stat: '1 care flag', tagline: 'A first-time spotter who leads with care.', streak: '1', journal: '2', flags: '1', area: 'Quezon City' }
         ];
         const fallbackAvatars = {
           'cat-round': '<svg viewBox="0 0 80 80" role="img" aria-label="Round sample cat avatar"><path d="M18 34 17 15l17 10c4-2 8-3 13-3s9 1 13 3l17-10-1 20c3 4 4 9 4 14 0 15-14 25-33 25S14 63 14 48c0-5 1-10 4-14Z" fill="#171717"/><circle cx="31" cy="45" r="7" fill="#fff"/><circle cx="57" cy="45" r="7" fill="#fff"/><circle cx="31" cy="45" r="2.5" fill="#ffb815"/><circle cx="57" cy="45" r="2.5" fill="#ffb815"/><path d="M36 58c4 4 8 4 12 0 4 4 8 4 12 0" fill="none" stroke="#ffb815" stroke-width="2.5" stroke-linecap="round"/></svg>',
           'cat-bengal': '<svg viewBox="0 0 80 80" role="img" aria-label="Bengal sample cat avatar"><path d="M17 31 16 11l18 12c4-2 8-3 12-3s8 1 12 3L76 11l-1 20c3 5 4 10 4 16 0 17-13 29-33 29S13 63 13 46c0-6 1-11 4-15Z" fill="#d9a447" stroke="#171717" stroke-width="3"/><path d="M23 34c2-3 5-3 7 0M50 35c2-3 5-3 7 0M25 57c2-3 5-3 7 0M51 57c2-3 5-3 7 0" fill="none" stroke="#171717" stroke-width="3" stroke-linecap="round"/><circle cx="31" cy="45" r="4.5" fill="#171717"/><circle cx="57" cy="45" r="4.5" fill="#171717"/><path d="M36 58c4 4 8 4 12 0" fill="none" stroke="#171717" stroke-width="2.8" stroke-linecap="round"/></svg>',
           'cat-sphynx': '<svg viewBox="0 0 80 80" role="img" aria-label="Sphynx sample cat avatar"><path d="M15 33 16 8l17 18c4-2 8-3 12-3s8 1 12 3L74 8l1 25c3 4 4 9 4 14 0 16-14 27-34 27S11 63 11 47c0-5 1-10 4-14Z" fill="#dcae9d" stroke="#171717" stroke-width="3" stroke-linejoin="round"/><path d="M22 35c7-4 13-4 20 0M58 35c-7-4-13-4-20 0M36 58c4 3 8 3 12 0" fill="none" stroke="#9b6b68" stroke-width="2" stroke-linecap="round"/><circle cx="31" cy="43" r="4" fill="#ffb815"/><circle cx="57" cy="43" r="4" fill="#ffb815"/></svg>'
         };
-        const fakeProfileCards = fakeProfiles.map((profile) => `<article class="demo-profile-card"><span class="demo-profile-avatar">${window.pawprintAvatarMarkup?.(profile.avatar) || fallbackAvatars[profile.avatar]}</span><strong>${profile.name}</strong><small>${profile.level}</small><small class="demo-profile-stat">${profile.stat}</small></article>`).join('');
-        layer.innerHTML = `<div class="demo-lock-card"><div class="demo-lock-paws" aria-hidden="true"><span>🐾</span><span>🐾</span><span>🐾</span></div><span class="eyebrow">Demo overview</span><h2>See how Pawprint feels.</h2><p>Explore the mobile layout and flow without signing in. Real captures, private Journal data, and community actions stay locked behind an account.</p><section class="demo-preview-accounts" aria-label="Fictional demo profiles"><div class="demo-preview-heading"><span>Sample profiles</span><span>Demo only · not real users</span></div><div class="demo-profile-strip">${fakeProfileCards}</div></section><button class="btn btn-amber" type="button" data-demo-signin>Sign up to unlock</button></div>`;
-        layer.querySelector('[data-demo-signin]')?.addEventListener('click', () => { window.pawprintDemoMode = false; body.classList.remove('demo-mode'); window.pawprintOpenAuth?.('signup'); });
+        const fakeProfileCards = fakeProfiles.map((profile) => `<button class="demo-profile-card" type="button" data-demo-profile="${profile.id}" aria-label="Open ${profile.name} demo profile"><span class="demo-profile-avatar">${window.pawprintAvatarMarkup?.(profile.avatar) || fallbackAvatars[profile.avatar]}</span><strong>${profile.name}</strong><small>${profile.level}</small><small class="demo-profile-stat">${profile.stat}</small></button>`).join('');
+        const profileAvatar = profile => window.pawprintAvatarMarkup?.(profile.avatar) || fallbackAvatars[profile.avatar];
+        const renderDemoTab = (panel, profile, tab) => {
+          const content = {
+            home: `<h3>${profile.name}'s demo home</h3><div class="demo-demo-map"><span class="demo-demo-pin one"></span><span class="demo-demo-pin two"></span></div><p>Approximate areas only · delayed 5 minutes</p><div class="demo-demo-list"><article><strong>Today's small goal</strong><small>1 cat · ${profile.streak}/7 day streak</small></article><article><strong>Recent pawprints</strong><small>${profile.area} · demo data</small></article></div>`,
+            journal: `<h3>Cat Journal</h3><p>Private collection · demo-only records</p><div class="demo-demo-list"><article><strong>Orange tabby</strong><small>Today · common</small></article><article><strong>All black</strong><small>Oct 19 · rare</small></article><article><strong>Calico friend</strong><small>Keep exploring</small></article></div>`,
+            care: `<h3>Care for the community</h3><p>These are fictional demo flags. No real user or rescue action is created.</p><div class="demo-demo-care"><strong>Water needed near the corner store</strong><span>${profile.area} · approximate area</span></div><div class="demo-demo-care" style="margin-top:8px"><strong>Kittens under a parked van</strong><span>Demo-only care flag</span></div>`,
+            profile: `<h3>Demo privacy controls</h3><p>This profile is fictional and never writes to Supabase.</p><div class="demo-demo-private"><span>Public visibility</span><strong>Friends</strong></div><div class="demo-demo-private"><span>Approximate map only</span><strong>Always on</strong></div><div class="demo-demo-private"><span>Exact location</span><strong>Private</strong></div>`
+          }[tab] || '';
+          panel.innerHTML = content;
+        };
+        const openDemoProfile = profileId => {
+          const profile = fakeProfiles.find(item => item.id === profileId) || fakeProfiles[0];
+          const prototypeProfile = profile.id === 'alley-scout' ? 'alley' : profile.id === 'calico-friend' ? 'calico' : 'mimi';
+          body.classList.add('demo-profile-open');
+          layer.innerHTML = `<div class="demo-profile-view demo-prototype-view"><div class="demo-app-bar"><button type="button" data-demo-back aria-label="Back to sample profiles">← Back</button><span>Pawprint demo</span><span class="demo-demo-badge">No account needed</span></div><iframe class="demo-prototype-frame" title="Pawprint mobile demo" src="/pawprint-prototype.html?profile=${prototypeProfile}&embed=1"></iframe></div>`;
+          layer.querySelector('[data-demo-back]')?.addEventListener('click', () => { body.classList.remove('demo-profile-open'); layer.remove(); ensureLayer(); });
+        };
+        layer.innerHTML = `<div class="demo-lock-card"><div class="demo-lock-paws" aria-hidden="true"><span>🐾</span><span>🐾</span><span>🐾</span></div><span class="eyebrow">Demo overview</span><h2>See how Pawprint feels.</h2><p>Explore the mobile layout and flow without signing in. Real captures, private Journal data, and community actions stay locked behind an account.</p><section class="demo-preview-accounts" aria-label="Fictional demo profiles"><div class="demo-preview-heading"><span>Sample profiles</span><span>Demo only · not real users</span></div><div class="demo-profile-strip">${fakeProfileCards}</div></section><p class="demo-demo-hint">Tap a sample profile to open the demo system.</p></div>`;
+        layer.querySelectorAll('[data-demo-profile]').forEach(button => button.addEventListener('click', () => openDemoProfile(button.dataset.demoProfile)));
         app.appendChild(layer);
       };
       const openDemo = () => {
@@ -1030,15 +1111,19 @@
         if (location.hash !== '#app') history.pushState({}, '', `${location.pathname}${location.search || '?demo=1'}#app`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
-      const closeAuthInDemo = () => {
-        if (!window.pawprintDemoMode) return;
-        const auth = document.querySelector('.auth-backdrop');
-        if (auth?.classList.contains('is-open')) {
-          auth.classList.remove('is-open');
-          auth.setAttribute('aria-hidden', 'true');
-        }
+      window.pawprintOpenDemo = openDemo;
+      const exitDemoAfterAuth = () => {
+        window.pawprintDemoMode = false;
+        body.classList.remove('demo-mode', 'demo-auth-open', 'demo-profile-open');
+        document.documentElement.classList.remove('demo-requested');
+        app?.querySelector('.demo-lock-layer')?.remove();
       };
-      new MutationObserver(closeAuthInDemo).observe(document.body, { childList: true, attributes: true, subtree: true });
+      window.addEventListener('pawprint-authenticated', exitDemoAfterAuth);
+      document.addEventListener('click', event => {
+        const auth = event.target.closest?.('.auth-backdrop');
+        if (!auth || window.pawprintSession) return;
+        if (event.target === auth || event.target.closest('[data-close-auth]')) body.classList.remove('demo-auth-open');
+      }, true);
       document.addEventListener('click', event => {
         const trigger = event.target.closest?.('[data-open-demo]');
         if (!trigger) return;
@@ -1272,24 +1357,21 @@
       landing.dataset.auditApplied='1';
       const q=(selector,root=document)=>root?.querySelector(selector);
       const setText=(selector,value,root=document)=>{const node=q(selector,root);if(node)node.textContent=value;return node};
+      const makeDemoTrigger=node=>{if(!node)return node;node.removeAttribute('data-open-app');node.dataset.openDemo='1';if(node.tagName==='A')node.href='/?demo=1#app';return node};
 
       const navActions=q('.nav-actions');
       if(navActions){
         const appTriggers=[...navActions.querySelectorAll('[data-open-app]')];
         const primary=appTriggers[0];
-        if(primary){primary.textContent='Try the app';primary.className='btn btn-dark btn-small'}
+        if(primary){primary.textContent='Try the app';primary.className='btn btn-dark btn-small';makeDemoTrigger(primary)}
         appTriggers.slice(1).forEach(node=>node.remove());
-        if(!q('[data-pawprint-auth-trigger]',navActions)){
-          const signIn=document.createElement('button');
-          signIn.type='button';signIn.className='nav-signin';signIn.dataset.pawprintAuthTrigger='1';signIn.dataset.openAuth='1';signIn.textContent='Sign in';
-          navActions.append(signIn);
-        }
+        navActions.querySelectorAll('[data-pawprint-auth-trigger],[data-open-auth]').forEach(node=>node.remove());
       }
 
       const hero=q('.hero');
       const heroTitle=q('h1',hero);
       if(heroTitle)heroTitle.innerHTML='Gotta spot<span>’em all.</span>';
-      const heroButton=q('[data-open-app]',hero);if(heroButton)heroButton.textContent='Try the app';
+      const heroButton=q('[data-open-app]',hero);if(heroButton){heroButton.textContent='Try the app';makeDemoTrigger(heroButton)}
       const heroMicro=q('.microcopy',hero);if(heroMicro)heroMicro.innerHTML='<b>Early access is open.</b> Try the browser app today. <span lang="fil">Hanapin ang pusa. Mag-iwan ng bakas.</span>';
       const waitlistForm=q('#waitlistForm');
       const waitlistButton=q('button[type="submit"]',waitlistForm);
@@ -1307,7 +1389,14 @@
         new MutationObserver(()=>{if(waitlistButton.textContent.includes('Reserve my spot'))syncWaitlistCopy()}).observe(waitlistButton,{childList:true,characterData:true,subtree:true});
       }
       if(waitlistStatus){
-        new MutationObserver(()=>{if(waitlistStatus.textContent.includes('whitelist'))waitlistStatus.textContent=waitlistStatus.textContent.replace('whitelist','waitlist')}).observe(waitlistStatus,{childList:true,characterData:true,subtree:true});
+        const recoverWaitlistButton=()=>{
+          if(!waitlistButton)return;
+          const message=waitlistStatus.textContent||'';
+          const completed=message.includes('early-access list')&&!message.includes('Could not')&&!message.includes('taking too long')&&!message.includes('Enter a valid');
+          if(completed){waitlistButton.disabled=false;waitlistButton.textContent=`Get notified for ${selectedPlatform()}`;}
+        };
+        new MutationObserver(()=>{if(waitlistStatus.textContent.includes('whitelist'))waitlistStatus.textContent=waitlistStatus.textContent.replace('whitelist','waitlist');recoverWaitlistButton()}).observe(waitlistStatus,{childList:true,characterData:true,subtree:true});
+        recoverWaitlistButton();
       }
 
       const peekCaption=q('.sneak-peek-card figcaption');if(peekCaption)peekCaption.textContent='One connected Pawprint view';
@@ -1361,7 +1450,7 @@
         legal.classList.add('footer-legal');
         const footer=q('footer');if(footer)footer.insertBefore(legal,footer.querySelector('.footer-cat'));
       }
-      const cta=q('.cta');const ctaButton=q('[data-open-app]',cta);if(ctaButton)ctaButton.textContent='Try the app';
+      const cta=q('.cta');const ctaButton=q('[data-open-app]',cta);if(ctaButton){ctaButton.textContent='Try the app';makeDemoTrigger(ctaButton)}
       const ctaCopy=q('p',cta);if(ctaCopy)ctaCopy.textContent='Start with the browser app today—then keep your sightings, Journal, and care tools in one place.';
       const footerMotto=q('footer .footer-row span');if(footerMotto)footerMotto.innerHTML='<b>Pawprint</b> · Gotta spot ’em all.';
       document.title='Pawprint — Gotta spot ’em all.';
@@ -1392,5 +1481,67 @@
       new MutationObserver(hydrate).observe(document.body, {childList: true, subtree: true});
     })();
   </script>
-  </body>
+  <script id="mobile-home-entrypoint-fix">
+    (() => {
+      const body = document.body;
+      const dashboard = document.getElementById('dashboard');
+      const existingLoadDashboard = window.loadDashboard;
+      window.pawprintGoHome = () => typeof go === 'function' ? go('home') : null;
+      window.loadDashboard = (...args) => {
+        const needsMobileHome = body.classList.contains('is-app') && window.PawprintUI && dashboard && !dashboard.querySelector('.pw-home');
+        if (needsMobileHome) return window.pawprintGoHome();
+        return existingLoadDashboard?.(...args);
+      };
+    })();
+  </script>
+  <style id="recovery-state-styles">
+    #dailyGoalMetric .pw-goal-retry{min-height:30px;padding:5px 9px;border:1.5px solid var(--ink,#151515);border-radius:999px;background:var(--amber,#ffb815);color:var(--ink,#151515);font:800 .68rem/1 inherit;cursor:pointer;box-shadow:2px 2px 0 var(--ink,#151515)}
+    #dailyGoalMetric .pw-goal-retry:focus-visible{outline:3px solid color-mix(in srgb,var(--amber,#ffb815) 55%,transparent);outline-offset:2px}
+  </style>
+  <script id="auth-and-recovery-guards">
+    (()=>{
+      // Returning to the public landing page is an explicit sign-out boundary.
+      // The existing data-show-landing handler still closes the app and camera.
+      document.addEventListener('click',event=>{
+        const trigger=event.target.closest?.('[data-show-landing]');
+        if(trigger&&window.pawprintSession) void window.pawprintSignOut?.({quiet:true});
+      },true);
+
+      const enhanceGoalRecovery=()=>{
+        const goal=document.getElementById('dailyGoalMetric');
+        if(!goal||goal.querySelector('.pw-goal-retry')||goal.textContent.trim()!=='Unavailable')return;
+        const signedIn=Boolean(window.pawprintSession);
+        const button=document.createElement('button');
+        button.type='button';button.className='pw-goal-retry';button.textContent=signedIn?'Retry goal':'Sign in to sync';
+        button.addEventListener('click',()=>{
+          if(!window.pawprintSession){window.pawprintOpenAuth?.('login');return;}
+          button.disabled=true;button.textContent='Checking…';window.loadDashboard?.();
+        });
+        goal.replaceChildren(button);
+      };
+      enhanceGoalRecovery();
+      new MutationObserver(enhanceGoalRecovery).observe(document.body,{childList:true,subtree:true,characterData:true});
+    })();
+  </script>
+  <script id="waitlist-submit-recovery">
+    (() => {
+      const settle = () => {
+        const form = document.getElementById('waitlistForm');
+        const button = form?.querySelector('button[type="submit"]');
+        const status = document.getElementById('waitlistStatus');
+        const message = status?.textContent || '';
+        if (!button || !/early[- ]access list/i.test(message) || /Could not|taking too long|Enter a valid/i.test(message)) return;
+        const platform = ({ios:'iOS',android:'Android',ios_android:'iOS & Android'}[form.platformInterest?.value] || 'iOS & Android');
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = `Get notified for ${platform}`;
+      };
+      const status = document.getElementById('waitlistStatus');
+      if (status) new MutationObserver(settle).observe(status, {childList:true, characterData:true, subtree:true});
+      settle();
+      let attempts = 0;
+      const timer = setInterval(() => { settle(); if (++attempts >= 40) clearInterval(timer); }, 250);
+    })();
+  </script>
+</body>
 </html>
