@@ -369,8 +369,13 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
     const email = String(body.email || "").trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(email)) return errorResponse("INVALID_EMAIL", 400);
     const platform = String(body.platformInterest || "ios_android");
-    const result = await supabase.from("waitlist_signups").upsert({ id: crypto.randomUUID(), email, platform_interest: platform, source: String(body.source || "landing"), created_at: new Date().toISOString() }, { onConflict: "email", ignoreDuplicates: true });
-    if (result.error) throw result.error;
+    // The database unique constraint is the final duplicate guard. Use INSERT
+    // instead of upsert so a repeat signup cannot trigger another email.
+    const result = await supabase.from("waitlist_signups").insert({ id: crypto.randomUUID(), email, platform_interest: platform, source: String(body.source || "landing"), created_at: new Date().toISOString() });
+    if (result.error) {
+      if (result.error.code === "23505") return response({ status: "already_subscribed", confirmationEmail: "not_sent" });
+      throw result.error;
+    }
     let confirmationEmail = "queued";
     try { confirmationEmail = (await sendBrevoConfirmation(email, platform)).sent ? "sent" : "queued"; } catch (error) { console.error(error); }
     return response({ status: "subscribed", confirmationEmail }, 201);
