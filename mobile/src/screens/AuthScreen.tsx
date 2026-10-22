@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { AppText, Button, Card, Icon } from '@/components';
-import { sendEmailCode, signInWithPassword, signInWithProvider, signUpWithPassword, verifyEmailCode } from '@/lib/api';
+import { requestPasswordReset, signInWithPassword, signInWithProvider, signUpWithPassword } from '@/lib/api';
 import { border, font, radius, space, useTheme } from '@/theme';
 import logo from '../../assets/logo.png';
 
@@ -10,10 +10,8 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [code, setCode] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [method, setMethod] = useState<'password' | 'code'>('password');
-  const [sent, setSent] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [privacyVisible, setPrivacyVisible] = useState(false);
@@ -23,32 +21,6 @@ export function AuthScreen() {
   const contentWidth = Math.min(Math.max(width - pagePadding * 2, 0), 520);
 
   const input = { borderWidth: border, borderColor: t.edge, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: t.card, color: t.ink, fontFamily: font.medium, fontSize: 15 } as const;
-
-  const submit = async () => {
-    setError('');
-    setBusy(true);
-    try {
-      if (!sent) {
-        await sendEmailCode(email);
-        setSent(true);
-        Alert.alert('Check your email', 'We sent an 8-digit sign-in code through Brevo.');
-      } else {
-        if (password && password.length < 6) {
-          setError('Your new password must have at least 6 characters.');
-          return;
-        }
-        await verifyEmailCode(email, code, password || undefined);
-        if (password) Alert.alert('Password set', 'You can use your email and password the next time you log in.');
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Please try again.';
-      setError(message.toLowerCase().includes('invalid login credentials')
-        ? 'Password not recognized. If you joined with an email code, use the one-time email code instead.'
-        : message);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const submitPassword = async () => {
     setError('');
@@ -79,6 +51,18 @@ export function AuthScreen() {
     try { await signInWithProvider(provider); } catch (e) { setError(e instanceof Error ? e.message : 'Could not continue.'); } finally { setBusy(false); }
   };
 
+  const sendReset = async () => {
+    setError('');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setError('Enter the email used for your Pawprint account.'); return; }
+    setBusy(true);
+    try {
+      await requestPasswordReset(email);
+      Alert.alert('Check your email', 'Use the Supabase recovery link to choose a new password, then return to Pawprint and log in.');
+      setResetMode(false);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not send the reset email.'); }
+    finally { setBusy(false); }
+  };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: pagePadding, paddingVertical: compact ? space.lg : space.xxl }} keyboardShouldPersistTaps="handled">
@@ -99,16 +83,22 @@ export function AuthScreen() {
           </View>
           <Card>
             <View style={{ gap: 10 }}>
-              <TextInput value={email} onChangeText={setEmail} editable={!sent} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="Your email address" placeholderTextColor={t.stone} style={input} />
-              {method === 'password' ? (
+              <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="Your email address" placeholderTextColor={t.stone} style={input} />
+              <View style={{ position: 'relative' }}>
+                <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} placeholder="Password" placeholderTextColor={t.stone} style={[input, { paddingRight: 48 }]} />
+                <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword((visible) => !visible)} style={{ position: 'absolute', top: 0, right: 8, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} color={t.stone} />
+                </Pressable>
+              </View>
+              {resetMode ? (
                 <>
-                  <View style={{ position: 'relative' }}>
-                    <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} placeholder="Password" placeholderTextColor={t.stone} style={[input, { paddingRight: 48 }]} />
-                    <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword((visible) => !visible)} style={{ position: 'absolute', top: 0, right: 8, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} color={t.stone} />
-                    </Pressable>
-                  </View>
+                  <Button label={busy ? 'Please wait…' : 'Send reset email'} onPress={sendReset} disabled={busy || !email} />
+                  <Pressable accessibilityRole="button" onPress={() => { setResetMode(false); setError(''); }}><AppText size={12} weight="bold" color={t.ink} style={{ textAlign: 'center', textDecorationLine: 'underline' }}>Back to log in</AppText></Pressable>
+                </>
+              ) : (
+                <>
                   <Button label={busy ? 'Please wait…' : authMode === 'login' ? 'Log in securely' : 'Create account'} onPress={submitPassword} disabled={busy || !email || password.length < 6} />
+                  {authMode === 'login' && <Pressable accessibilityRole="button" onPress={() => { setResetMode(true); setError(''); }}><AppText size={12} weight="bold" color={t.ink} style={{ textAlign: 'center', textDecorationLine: 'underline' }}>Forgot password?</AppText></Pressable>}
                   <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
                     <AppText muted size={12}>{authMode === 'login' ? 'New to Pawprint?' : 'Already have an account?'}</AppText>
                     <Pressable accessibilityRole="button" onPress={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setError(''); }}>
@@ -116,22 +106,7 @@ export function AuthScreen() {
                     </Pressable>
                   </View>
                 </>
-              ) : (
-                <>
-                  <TextInput value={code} onChangeText={setCode} editable={sent} keyboardType="number-pad" maxLength={8} placeholder={sent ? '8-digit email code' : 'Code appears after sending'} placeholderTextColor={t.stone} style={[input, !sent && { opacity: 0.6 }]} />
-                  <AppText muted size={12} style={{ marginTop: 1 }}>Optional: set a password for future logins</AppText>
-                  <View style={{ position: 'relative' }}>
-                    <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} autoCapitalize="none" autoComplete="new-password" placeholder="New password (optional)" placeholderTextColor={t.stone} style={[input, { paddingRight: 48 }]} />
-                    <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword((visible) => !visible)} style={{ position: 'absolute', top: 0, right: 8, bottom: 0, width: 38, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={showPassword ? 'eyeOff' : 'eye'} size={20} color={t.stone} />
-                    </Pressable>
-                  </View>
-                  <Button label={busy ? 'Please wait…' : sent ? 'Verify and load live data' : 'Send sign-in code'} onPress={submit} disabled={busy || !email || (sent && code.length < 6)} />
-                </>
               )}
-              <Pressable accessibilityRole="button" onPress={() => { setMethod(method === 'password' ? 'code' : 'password'); setSent(false); setCode(''); setPassword(''); setError(''); }} style={{ alignSelf: 'center', padding: 4 }}>
-                <AppText muted size={12} style={{ textDecorationLine: 'underline' }}>{method === 'password' ? 'Use a one-time email code instead' : 'Use password instead'}</AppText>
-              </Pressable>
               {error ? <AppText color={t.red} size={12} style={{ textAlign: 'center' }}>{error}</AppText> : null}
             </View>
           </Card>

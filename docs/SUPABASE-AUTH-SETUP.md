@@ -1,6 +1,6 @@
 # Pawprint Supabase Auth setup
 
-Pawprint does not implement passwords, sessions, or social OAuth itself. The browser uses Supabase Auth with PKCE and the `pawprint-api` Edge Function verifies the Supabase access token through Supabase's `/auth/v1/user` endpoint.
+Pawprint does not implement password hashing, sessions, or social OAuth itself. Email/password sign-up, login, confirmation, and recovery are handled by Supabase Auth. The browser uses Supabase Auth with PKCE and the `pawprint-api` Edge Function verifies the Supabase access token through Supabase's `/auth/v1/user` endpoint.
 
 ## Site environment variables
 
@@ -15,14 +15,14 @@ The `/api/auth/config` endpoint exposes only these two public values. Until they
 
 In Supabase Authentication settings, enable Email provider for password sign-up/login and password reset. Configure Magic Link, Google, and Apple as needed. Add only real app domains to the Supabase URL Configuration allow-list:
 
-- `https://pawprint.madison88-0851.chatgpt.site/auth/callback`
+- `https://pawprint-omega.vercel.app/auth/callback`
 - `http://localhost:4173/auth/callback` for local testing only
 
 For Google and Apple, register Supabase's provider callback URL in the provider console, then paste the provider credentials into Supabase. The app redirects users back to `/auth/callback`, exchanges the PKCE code, and sends first-time users to onboarding.
 
 ## Profile privacy and privacy notice
 
-Run [`supabase-auth.sql`](./supabase-auth.sql) in the Supabase SQL Editor. The table stores only the user's chosen nickname, sketch avatar identifier, age group, and the version/time of the privacy notice they accepted. It does not copy the provider's real name, provider avatar, or email. Row Level Security allows public profile reads and limits writes to the matching `auth.uid()`.
+Run [`supabase-auth.sql`](./supabase-auth.sql) in the Supabase SQL Editor. The table stores only the user's chosen nickname, sketch avatar identifier, age group, and the version/time of the privacy notice they accepted. It does not copy the provider's real name, provider avatar, or email. Row Level Security limits direct profile reads and writes to the matching `auth.uid()`; public-facing nickname/avatar projections are returned by the authenticated Edge Function only.
 
 The onboarding notice is written for the Philippine Data Privacy Act of 2012 (Republic Act No. 10173): it explains the purpose of processing, the data collected, the user's access/correction/export/deletion and objection or withdrawal options where applicable, and how to raise a privacy concern. Pawprint requests location only during an explicit cat-capture flow after device permission; it does not silently track or alter device location. Public pins are approximate, delayed by at least five minutes, and expire after 24 hours. Photos are re-encoded before storage or sharing so GPS EXIF metadata is removed.
 

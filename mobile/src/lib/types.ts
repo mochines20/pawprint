@@ -12,8 +12,12 @@ export type Sighting = {
   seenCount: number;
   expiresIn: string;
   seenAgo: string;
+  catBreed?: string;
+  description?: string;
+  photoUrl?: string | null;
+  emergency?: boolean;
+  capturedAt?: string;
   spottedBy?: string;
-  photoUrl?: string;
 };
 
 export type CareNeed = 'Water' | 'Food' | 'Injured' | 'Kittens alone' | 'Stuck / unsafe' | 'Other';

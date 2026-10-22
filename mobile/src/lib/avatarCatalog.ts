@@ -37,7 +37,13 @@ export const AVATAR_CHOICES: AvatarChoice[] = [
 ];
 
 export function avatarChoice(id?: string | null): AvatarChoice {
-  return AVATAR_CHOICES.find((choice) => choice.id === id) ?? AVATAR_CHOICES[0];
+  const choice = AVATAR_CHOICES.find((item) => item.id === id) ?? AVATAR_CHOICES[0];
+  // Keep the shared Tangerine avatar visibly distinct from Ink. The original
+  // artwork used a black body with orange accents, which looked like the same
+  // cat in the mobile picker. Preserve the original outline/details and only
+  // recolor its main body for the selected orange variant.
+  if (choice.id === 'cat-orange') return { ...choice, xml: choice.xml.replace('fill="#171717"', 'fill="#F28B24"') };
+  return choice;
 }
 
 export function avatarForVariant(variant: CatVariant): AvatarId {

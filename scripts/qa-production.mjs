@@ -5,7 +5,7 @@ if (!baseUrl) {
   console.error('Set PAWPRINT_QA_BASE_URL to the deployed app or Supabase API URL before running production QA.');
   process.exitCode = 1;
 } else {
-  const checks = ['/api/health', '/api/auth/config', '/manifest.webmanifest', '/sw.js'];
+  const checks = ['/api/health', '/api/auth/config', '/manifest.webmanifest', '/sw.js', '/', '/privacy', '/terms', '/support'];
   let failed = 0;
   for (const path of checks) {
     try {

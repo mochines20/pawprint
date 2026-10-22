@@ -9,6 +9,15 @@ Run `supabase/migrations/20261017000000_pawprint_app.sql` in the Supabase SQL
 Editor, or use the Supabase CLI migrations workflow. It creates the application
 tables, RLS boundaries, and the private `pawprint-sightings` Storage bucket.
 
+For the mobile launch, apply the profile/onboarding migrations in order:
+`20261022000002_mobile_profile_preferences.sql`,
+`20261022000003_unique_mobile_nicknames.sql`,
+`20261022000004_mobile_safety_controls.sql`,
+`20261022000005_fix_profile_rls.sql`, and
+`20261022000006_fix_report_anonymization.sql`. The last migration keeps
+moderation evidence while safely anonymizing legacy `reports.user_id` text
+values during account deletion.
+
 Run `docs/supabase-auth.sql` as well if the `profiles` table has not been
 created yet.
 
@@ -22,7 +31,7 @@ Supabase CLI or the Supabase dashboard. Configure these Edge Function secrets:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY` or `OLLAMA_BASE_URL` and `OLLAMA_MODEL`
 - `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`
-- Optional `PAWPRINT_PUBLIC_URL`
+- Optional `PAWPRINT_PUBLIC_URL` (production: `https://pawprint-omega.vercel.app`)
 - `ADMIN_USER_IDS`
 - `PUSH_PUBLIC_KEY`, `PUSH_PRIVATE_KEY`, and `PUSH_SUBJECT`
 - `MAINTENANCE_TOKEN`
@@ -34,7 +43,8 @@ The waitlist confirmation email is already on-brand in the Edge Function. The
 function sends Pawprint's built-in responsive HTML directly through Brevo's
 transactional API, with the amber CTA, outlined card, actual Pawprint logo,
 privacy note, and mobile-safe layout. A Brevo template ID is not required.
-Set `PAWPRINT_PUBLIC_URL` to the production HTTPS URL to enable the email CTA
+Set `PAWPRINT_PUBLIC_URL=https://pawprint-omega.vercel.app` in the production
+Edge Function secrets to enable the email CTA
 and logo. Keep it blank in local preview so the email does not link to
 localhost.
 
@@ -82,3 +92,8 @@ Run the local build and browser checks first. Then run the authenticated matrix
 against the deployed function using two normal users and one admin: privacy
 isolation, duplicate/idempotency, AI rejection, offline retry, account deletion,
 care resolution, blocking, and Philippines timezone streak boundaries.
+
+The deterministic checks are `npm run qa:edge`, `npm run qa:dhash`,
+`npm run qa:mobile`, and `npm run build`. The public Privacy, Terms, Support,
+and account-deletion URLs must return HTTP 200 without requiring a ChatGPT or
+other account before store submission.

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { createElement, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,30 +19,45 @@ export function SpotScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
   const cam = useRef<CameraView>(null);
+  const webInput = useRef<any>(null);
   const [perm, requestPerm] = useCameraPermissions();
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [tip, setTip] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [detected, setDetected] = useState<{ variant: CatVariant; pct: number } | null>(null);
 
-  const finish = async (uri: string) => {
+  const finish = async (uri: string, captureSource: 'camera' | 'gallery') => {
     setBusy(true);
     try {
-      const location = await Location.requestForegroundPermissionsAsync();
-      if (location.status !== 'granted') throw new Error('LOCATION_PERMISSION_REQUIRED');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      if (captureSource === 'camera') {
+        const location = await Location.requestForegroundPermissionsAsync();
+        if (location.status !== 'granted') throw new Error('LOCATION_PERMISSION_REQUIRED');
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      }
       const res = await submitSighting({
         photoUri: uri,
+        captureSource,
         showPin: true,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
+        latitude,
+        longitude,
         description: 'Street cat spotted near my current location.',
         capturedAt: new Date().toISOString(),
       });
+      if (res.status !== 'accepted') {
+        setDetected(null);
+        Alert.alert('Pawprint needs a review', res.reason || 'The photo was saved for review.');
+        return;
+      }
       const variant: CatVariant = res.variant;
       setDetected({ variant, pct: res.pct });
-      if (res.status !== 'accepted') {
-        Alert.alert('Pawprint needs a review', res.reason || 'The photo was saved for review.');
+      if (captureSource === 'gallery') {
+        Alert.alert('Saved to Journal', 'Gallery uploads do not earn XP or extend your streak. Use a fresh camera capture for rewards.');
         return;
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -56,14 +71,42 @@ export function SpotScreen() {
 
   const shoot = async () => {
     if (busy || !cam.current) return;
-    // exif: false keeps GPS out of the file. The server strips metadata again.
-    const pic = await cam.current.takePictureAsync({ quality: 0.7, exif: false });
-    if (pic?.uri) await finish(pic.uri);
+    if (cameraError) {
+      Alert.alert('Camera unavailable', 'Close other apps using the camera, then reopen Pawprint and try again.');
+      return;
+    }
+    if (!cameraReady) {
+      Alert.alert('Camera is starting', 'Wait a moment for the camera preview to become ready.');
+      return;
+    }
+    try {
+      // exif: false keeps GPS out of the file. The server strips metadata again.
+      const pic = await Promise.race([
+        cam.current.takePictureAsync({ quality: 0.7, exif: false }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+      ]);
+      if (!pic?.uri) throw new Error('CAMERA_CAPTURE_TIMEOUT');
+      await finish(pic.uri, 'camera');
+    } catch (error) {
+      Alert.alert('Could not take photo', error instanceof Error && error.message === 'CAMERA_CAPTURE_TIMEOUT' ? 'The camera did not respond. Close other camera apps and try again.' : 'Please try the camera again.');
+    }
+  };
+
+  const handleWebFile = async (event: any) => {
+    const file = event.currentTarget?.files?.[0] as File | undefined;
+    event.currentTarget.value = '';
+    if (!file) return;
+    const uri = URL.createObjectURL(file);
+    try { await finish(uri, 'gallery'); } finally { URL.revokeObjectURL(uri); }
   };
 
   const pick = async () => {
+    if (Platform.OS === 'web') {
+      webInput.current?.click();
+      return;
+    }
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, exif: false });
-    if (!r.canceled && r.assets[0]) await finish(r.assets[0].uri);
+    if (!r.canceled && r.assets[0]) await finish(r.assets[0].uri, 'gallery');
   };
 
   if (!perm) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
@@ -83,7 +126,21 @@ export function SpotScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} />
+      {Platform.OS === 'web' && createElement('input', {
+        ref: webInput,
+        type: 'file',
+        accept: 'image/*',
+        onChange: handleWebFile,
+        'aria-label': 'Choose cat photo',
+        style: { position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' },
+      })}
+      <CameraView
+        ref={cam}
+        style={StyleSheet.absoluteFill}
+        facing={facing}
+        onCameraReady={() => { setCameraReady(true); setCameraError(null); }}
+        onMountError={(event) => { setCameraReady(false); setCameraError(event.message || 'CAMERA_UNAVAILABLE'); }}
+      />
       {/* viewfinder corners */}
       {corner({ left: 44, top: '30%' }, { borderRightWidth: 0, borderBottomWidth: 0 })}
       {corner({ right: 44, top: '30%' }, { borderLeftWidth: 0, borderBottomWidth: 0 })}
@@ -107,6 +164,13 @@ export function SpotScreen() {
       {detected && (
         <View style={{ position: 'absolute', top: '24%', alignSelf: 'center' }}>
           <Chip tone="amber" icon={<Icon name="check" size={14} color="#151515" />} label={`Cat detected · ${COATS[detected.variant].name} · ${detected.pct}%`} />
+        </View>
+      )}
+
+      {cameraError && (
+        <View style={{ position: 'absolute', left: 24, right: 24, top: '42%', backgroundColor: '#151515', borderWidth: 2, borderColor: '#FFB815', borderRadius: 16, padding: 14 }}>
+          <AppText color="#fff" weight="bold" style={{ textAlign: 'center' }}>Camera unavailable</AppText>
+          <AppText size={12} color="#fff" style={{ marginTop: 5, textAlign: 'center' }}>Close other apps using the camera, then reopen this screen.</AppText>
         </View>
       )}
 

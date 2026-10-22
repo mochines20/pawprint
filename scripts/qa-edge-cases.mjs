@@ -9,7 +9,11 @@ const html = fs.readFileSync(path.join(root, "dist/index.html"), "utf8");
 const worker = fs.readFileSync(path.join(root, "worker/index.template.js"), "utf8");
 const assets = fs.readFileSync(path.join(root, "assets/mobile-ui.js"), "utf8") + fs.readFileSync(path.join(root, "assets/offline-queue.js"), "utf8") + fs.readFileSync(path.join(root, "assets/admin-console.js"), "utf8");
 const supabaseApi = fs.readFileSync(path.join(root, "supabase/functions/pawprint-api/index.ts"), "utf8");
-const deployment = fs.readFileSync(path.join(root, "supabase/migrations/20261017000000_pawprint_app.sql"), "utf8") + fs.readFileSync(path.join(root, "docs/SUPABASE-APP-SETUP.md"), "utf8");
+const dhash = fs.readFileSync(path.join(root, "supabase/functions/pawprint-api/dhash.ts"), "utf8");
+const rlsHarness = fs.readFileSync(path.join(root, "scripts/qa-two-user-rls.mjs"), "utf8");
+const storeMetadata = fs.readFileSync(path.join(root, "mobile/STORE_METADATA.md"), "utf8");
+const mobileConfig = fs.readFileSync(path.join(root, "mobile/app.json"), "utf8");
+const deployment = fs.readFileSync(path.join(root, "supabase/migrations/20261017000000_pawprint_app.sql"), "utf8") + fs.readFileSync(path.join(root, "supabase/migrations/20261022000006_fix_report_anonymization.sql"), "utf8") + fs.readFileSync(path.join(root, "docs/SUPABASE-APP-SETUP.md"), "utf8");
 const passed = [];
 const failed = [];
 const manual = [];
@@ -36,6 +40,10 @@ async function main() {
   await checkPublicEndpoint("/manifest.webmanifest");
   await checkPublicEndpoint("/sw.js");
   await checkPublicEndpoint("/");
+  await checkPublicEndpoint("/admin");
+  await checkPublicEndpoint("/privacy");
+  await checkPublicEndpoint("/terms");
+  await checkPublicEndpoint("/support");
 
   const contractChecks = [
     ["Reject non-cat/person/screenshot/AI images", ["IMAGE_NOT_A_CAT", "PERSON_DETECTED", "SCREENSHOT_DETECTED", "AI_GENERATED_IMAGE", "validation.status"]],
@@ -49,18 +57,22 @@ async function main() {
     ["Blocked users excluded from public map", ["blocks.blocked_user_id", "NOT EXISTS"]],
     ["Journal/profile are user-scoped", ["async function getJournal", "const user = await requireUser", "WHERE journal_entries.user_id=?"]],
     ["Admin moderation and care resolution", ["ADMIN_REQUIRED", "async function getModerationQueue", "async function resolveCareFlag"]],
-    ["Account deletion removes records and stored photos", ["async function deleteUser", "BUCKET.delete", "DELETE FROM sightings", "DELETE FROM users"]],
+    ["Account deletion removes records and stored photos", ["async function deleteUser", "BUCKET.delete", "DELETE FROM sightings", "DELETE FROM users", "target_user::text"]],
     ["Offline state has visible feedback", ["window.addEventListener('offline'", "You are offline"]],
     ["Offline sighting queue", ["indexedDB", "OFFLINE_QUEUED", "pawprint-offline"]],
     ["Brevo waitlist confirmation", ["sendBrevoWaitlistEmail", "api.brevo.com/v3/smtp/email", "BREVO_API_KEY"]],
     ["Push subscription storage and service worker delivery", ["push_subscriptions", "pushManager.subscribe", "addEventListener('push'"]],
     ["Supabase API and Storage persistence", ["SUPABASE_SERVICE_ROLE_KEY", "pawprint-sightings", "from(\"sightings\")", "storage_path"]],
     ["Admin moderation console", ["data-open-admin", "ADMIN_REQUIRED", "data-admin-action", "/api/admin/care-flags"]],
+    ["Perceptual duplicate image protection", ["photo_dhash", "dHashFromRgba", "hammingDistance", "SIMILAR_IMAGE"]],
+    ["Two-user RLS test harness", ["PAWPRINT_QA_USER_A_EMAIL", "PAWPRINT_QA_USER_B_EMAIL", "journal_entries", "reports"]],
+    ["Store privacy metadata", ["App Store", "Google Play", "accountDeletionUrl", "Privacy policy"]],
     ["Supabase-only deployment config", ["supabase/functions/pawprint-api/index.ts", "supabase/migrations", "SUPABASE_SERVICE_ROLE_KEY", "pawprint-sightings"]],
   ];
   for (const [name, needles] of contractChecks) {
-    if (includesAll(source + html + worker + assets + supabaseApi + deployment, needles)) pass(name, "source contract present");
-    else fail(name, `missing: ${needles.filter((needle) => !(source + html + worker + assets + supabaseApi + deployment).includes(needle)).join(", ")}`);
+    const contracts = source + html + worker + assets + supabaseApi + dhash + rlsHarness + storeMetadata + mobileConfig + deployment;
+    if (includesAll(contracts, needles)) pass(name, "source contract present");
+    else fail(name, `missing: ${needles.filter((needle) => !contracts.includes(needle)).join(", ")}`);
   }
 
   needsManual("Offline submit behavior", "An explicit offline submit guard is present; toggle the browser offline and confirm the sighting is not uploaded and the recovery message is clear.");

@@ -84,7 +84,7 @@ async function requireUser(request, env) {
   await env.DB.prepare(
     `INSERT INTO users (id, email, display_name, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET email=excluded.email, display_name=excluded.display_name, updated_at=excluded.updated_at`,
+     ON CONFLICT(id) DO UPDATE SET email=COALESCE(excluded.email, users.email), display_name=COALESCE(excluded.display_name, users.display_name), updated_at=excluded.updated_at`,
   ).bind(user.id, user.email, user.name, timestamp, timestamp).run();
   await ensureRuntimeTables(env);
   await env.DB.prepare("INSERT OR IGNORE INTO user_settings (user_id,updated_at) VALUES (?,?)").bind(user.id, timestamp).run();
@@ -353,7 +353,10 @@ function normalizeValidation(result = {}, env = {}) {
   else if (duplicate) { status = "rejected"; reason = "DUPLICATE_IMAGE"; }
   else if (!catDetected || catConfidence < catThreshold) { status = "rejected"; reason = "IMAGE_NOT_A_CAT"; }
   else if ((aiGenerated && aiGeneratedConfidence >= aiThreshold) || aiGeneratedConfidence >= aiThreshold) { status = "rejected"; reason = "AI_GENERATED_IMAGE"; }
-  else if (catConfidence < Math.min(0.9, catThreshold + 0.1) || aiGeneratedConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
+  // Respect the configured cat threshold directly. The old implicit +0.10
+  // review band caused clear real-cat photos around 0.80–0.89 to be stored
+  // as needs_review even though they passed AI_CAT_CONFIDENCE_THRESHOLD.
+  else if (aiGeneratedConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
   const breed = typeof result.suggestedBreed === "string" && result.suggestedBreed.trim() ? result.suggestedBreed.trim().slice(0, 80) : null;
   const coat = typeof result.suggestedCoatType === "string" && result.suggestedCoatType.trim() ? result.suggestedCoatType.trim().slice(0, 80) : null;
   const catType = breed || coat || "Unclassified cat";
@@ -642,32 +645,52 @@ async function getCareFlags(request, env) {
 async function updateProfile(request, env) {
   const user = await requireUser(request, env);
   const body = await request.json();
-  const displayName = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 80) : null;
+  const displayName = typeof body.displayName === "string" ? body.displayName.trim() : null;
   const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim().slice(0, 500) : null;
-  const ageGroup = ["13_17", "18_24", "25_34", "35_44", "45_plus", "prefer_not_to_say"].includes(body.ageGroup) ? body.ageGroup : null;
+  const ageGroup = ["under_13", "13_17", "18_24", "25_34", "35_44", "45_plus", "prefer_not_to_say"].includes(body.ageGroup) ? body.ageGroup : null;
+  const onboardingCompleted = body.onboardingCompleted === true;
+  const nicknamePattern = /^[A-Za-z0-9_]{3,20}$/;
+  const nicknameBlocked = displayName && (/^\S+@\S+\.\S+$/.test(displayName) || /(?:\+?\d[\d\s().-]{6,}\d)/.test(displayName) || ["asshole", "bitch", "fuck", "gago", "pota", "putang", "shit", "tanga", "ulol"].some((word) => displayName.toLowerCase().includes(word)));
+  if (onboardingCompleted && (!displayName || !nicknamePattern.test(displayName) || nicknameBlocked)) return json({ error: "INVALID_NICKNAME", message: "Choose a nickname with 3–20 letters, numbers, or underscores only. Do not use an email, phone number, or offensive word." }, 400);
+  if (displayName && (!nicknamePattern.test(displayName) || nicknameBlocked)) return json({ error: "INVALID_NICKNAME", message: "Choose a nickname with 3–20 letters, numbers, or underscores only." }, 400);
+  if (displayName) {
+    const taken = await env.DB.prepare("SELECT id FROM users WHERE lower(display_name)=lower(?) AND id<>? LIMIT 1").bind(displayName, user.id).first();
+    if (taken) return json({ error: "NICKNAME_TAKEN", message: "That nickname is already taken. Try the dice for another one." }, 409);
+  }
+  if (ageGroup === "under_13") return json({ error: "AGE_RESTRICTED", message: "Pawprint is for people aged 13 and above." }, 400);
+  if (onboardingCompleted && ageGroup === "13_17" && body.guardianConsent !== true) return json({ error: "GUARDIAN_CONSENT_REQUIRED", message: "Parent or legal guardian permission is required for ages 13–17." }, 400);
+  const validAreas = ["Muntinlupa", "Makati", "Manila", "Quezon City", "Pasig", "Taguig", "Cebu City", "Davao City", "Iloilo City", "Baguio", "Antipolo", "Cagayan de Oro", "Bacolod", "Other city or area"];
+  const locationArea = typeof body.locationArea === "string" ? body.locationArea.trim() : null;
+  if (onboardingCompleted && (!locationArea || !validAreas.some((area) => area.toLowerCase() === locationArea.toLowerCase()))) return json({ error: "INVALID_AREA", message: "Choose a city or area from the suggestions. Exact addresses are not accepted." }, 400);
+  if (onboardingCompleted && (body.safetyPledgeAccepted !== true || !body.privacyConsentAt || !body.termsAcceptedAt)) return json({ error: "CONSENT_REQUIRED", message: "Accept the safety pledge, Terms, and Privacy Policy to continue." }, 400);
   const timeZone = typeof body.timeZone === "string" && body.timeZone.length <= 80 ? body.timeZone : "Asia/Manila";
   const language = ["en", "fil", "es", "ja"].includes(body.language) ? body.language : "en";
   const defaultVisibility = ["public", "friends", "private"].includes(body.defaultVisibility) ? body.defaultVisibility : "friends";
   const notificationPreference = ["included", "important", "off"].includes(body.notificationPreference) ? body.notificationPreference : "included";
+  const catSpotterType = ["casual", "daily", "rescuer"].includes(body.catSpotterType) ? body.catSpotterType : null;
+  const streakReminders = typeof body.streakReminders === "boolean" ? (body.streakReminders ? 1 : 0) : null;
+  const careFlagReminders = typeof body.careFlagReminders === "boolean" ? (body.careFlagReminders ? 1 : 0) : null;
+  const safetyPledgeAccepted = body.safetyPledgeAccepted === true ? 1 : null;
+  const guardianConsentAt = body.guardianConsent === true ? now() : null;
   await env.DB.prepare(
-    `UPDATE users SET display_name=COALESCE(?, display_name), avatar_url=COALESCE(?, avatar_url), age_group=COALESCE(?, age_group), time_zone=?, language=?, updated_at=? WHERE id=?`,
-  ).bind(displayName, avatarUrl, ageGroup, timeZone, language, now(), user.id).run();
+    `UPDATE users SET display_name=COALESCE(?, display_name), avatar_url=COALESCE(?, avatar_url), age_group=COALESCE(?, age_group), location_area=COALESCE(?, location_area), privacy_notice_version=COALESCE(?, privacy_notice_version), privacy_consent_at=COALESCE(?, privacy_consent_at), onboarding_completed=CASE WHEN ? THEN 1 ELSE onboarding_completed END, time_zone=?, language=?, updated_at=? WHERE id=?`,
+  ).bind(displayName, avatarUrl, ageGroup, locationArea, body.privacyConsentVersion || null, body.privacyConsentAt || null, onboardingCompleted ? 1 : 0, timeZone, language, now(), user.id).run();
   await env.DB.prepare(
-    `INSERT INTO user_settings (user_id,default_visibility,show_age_group,allow_friend_requests,notification_preference,updated_at)
-     VALUES (?,?,?,?,?,?)
-     ON CONFLICT(user_id) DO UPDATE SET default_visibility=excluded.default_visibility,notification_preference=excluded.notification_preference,updated_at=excluded.updated_at`,
-  ).bind(user.id, defaultVisibility, body.showAgeGroup ? 1 : 0, body.allowFriendRequests === false ? 0 : 1, notificationPreference, now()).run();
+    `INSERT INTO user_settings (user_id,default_visibility,show_age_group,allow_friend_requests,notification_preference,cat_spotter_type,streak_reminders,care_flag_reminders,safety_pledge_accepted,safety_pledge_at,terms_accepted_at,guardian_consent_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(user_id) DO UPDATE SET default_visibility=excluded.default_visibility,notification_preference=excluded.notification_preference,cat_spotter_type=COALESCE(excluded.cat_spotter_type,user_settings.cat_spotter_type),streak_reminders=COALESCE(excluded.streak_reminders,user_settings.streak_reminders),care_flag_reminders=COALESCE(excluded.care_flag_reminders,user_settings.care_flag_reminders),safety_pledge_accepted=COALESCE(excluded.safety_pledge_accepted,user_settings.safety_pledge_accepted),safety_pledge_at=COALESCE(excluded.safety_pledge_at,user_settings.safety_pledge_at),terms_accepted_at=COALESCE(excluded.terms_accepted_at,user_settings.terms_accepted_at),guardian_consent_at=COALESCE(excluded.guardian_consent_at,user_settings.guardian_consent_at),updated_at=excluded.updated_at`,
+  ).bind(user.id, defaultVisibility, body.showAgeGroup ? 1 : 0, body.allowFriendRequests === false ? 0 : 1, notificationPreference, catSpotterType, streakReminders, careFlagReminders, safetyPledgeAccepted, safetyPledgeAccepted ? now() : null, body.termsAcceptedAt || null, guardianConsentAt, now()).run();
   await writeAudit(env, user.id, "profile.updated", "user", user.id, { timeZone, language });
-   const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.time_zone,users.language,
-      user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference
+    const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.location_area,users.privacy_notice_version,users.privacy_consent_at,users.onboarding_completed,users.time_zone,users.language,
+       user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference,user_settings.cat_spotter_type,user_settings.streak_reminders,user_settings.care_flag_reminders,user_settings.safety_pledge_accepted,user_settings.terms_accepted_at,user_settings.guardian_consent_at
       FROM users LEFT JOIN user_settings ON user_settings.user_id=users.id WHERE users.id=?`).bind(user.id).first();
   return json({ user: profile });
 }
 
 async function getProfile(request, env) {
   const user = await requireUser(request, env);
-  const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.time_zone,users.language,
-      user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference
+  const profile = await env.DB.prepare(`SELECT users.id,users.email,users.display_name,users.avatar_url,users.age_group,users.location_area,users.privacy_notice_version,users.privacy_consent_at,users.onboarding_completed,users.time_zone,users.language,
+      user_settings.default_visibility,user_settings.show_age_group,user_settings.allow_friend_requests,user_settings.notification_preference,user_settings.cat_spotter_type,user_settings.streak_reminders,user_settings.care_flag_reminders,user_settings.safety_pledge_accepted,user_settings.terms_accepted_at,user_settings.guardian_consent_at
       FROM users LEFT JOIN user_settings ON user_settings.user_id=users.id WHERE users.id=?`).bind(user.id).first();
   return json({ user: profile });
 }

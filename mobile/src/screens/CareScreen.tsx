@@ -1,8 +1,8 @@
-import { Alert, FlatList, View } from 'react-native';
+import { Alert, FlatList, Pressable, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppText, Button, Card, CatAvatar, Chip, Icon, Screen, ScreenHeader } from '@/components';
 import { useAsync } from '@/hooks/useAsync';
-import { createRescueRequest, fetchCareFlags } from '@/lib/api';
+import { blockContent, createRescueRequest, fetchCareFlags, reportContent } from '@/lib/api';
 import type { CareFlag } from '@/lib/types';
 import { space, useTheme } from '@/theme';
 import { useState } from 'react';
@@ -53,14 +53,24 @@ export function CareScreen() {
                 <AppText size={12} muted style={{ marginTop: 2 }}>{item.where}</AppText>
               </View>
             </View>
-            <Button
-              small
-              variant={helping[item.id] ? 'ghost' : 'primary'}
-              label={sending[item.id] ? 'Sending…' : helping[item.id] ? 'You’re on your way' : 'I can help'}
-              icon={helping[item.id] ? <Icon name="check" size={16} color={t.ink} /> : undefined}
-              onPress={() => void offerHelp(item)}
-              style={{ marginTop: 10 }}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10 }}>
+              <Button
+                small
+                variant={helping[item.id] ? 'ghost' : 'primary'}
+                label={sending[item.id] ? 'Sending…' : helping[item.id] ? 'You’re on your way' : 'I can help'}
+                icon={helping[item.id] ? <Icon name="check" size={16} color={t.ink} /> : undefined}
+                onPress={() => void offerHelp(item)}
+                style={{ flex: 1 }}
+              />
+              <Pressable accessibilityRole="button" onPress={() => Alert.alert('Report this Care Flag?', 'Report inaccurate, unsafe, or inappropriate information.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Report', style: 'destructive', onPress: () => { void reportContent('care_flag', item.id, 'unsafe_or_inappropriate').then(() => Alert.alert('Report sent', 'Thanks. Pawprint will review it.')).catch(() => Alert.alert('Could not send report', 'Please try again.')); } },
+              ])}><AppText size={12} muted style={{ textDecorationLine: 'underline' }}>Report</AppText></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => Alert.alert('Block this spotter?', 'Their future public pins will no longer appear on your map.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Block', style: 'destructive', onPress: () => { void blockContent('care_flag', item.id).then(() => Alert.alert('Spotter blocked', 'Their future public pins will be hidden.')).catch(() => Alert.alert('Could not block spotter', 'Please try again.')); } },
+              ])}><AppText size={12} muted style={{ textDecorationLine: 'underline' }}>Block</AppText></Pressable>
+            </View>
           </Card>
         )}
       />

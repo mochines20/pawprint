@@ -1,34 +1,33 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import * as Location from 'expo-location';
-import { AppText, Button, Card } from '@/components';
+import { AppText, Button, Card, ProfileDetailsForm } from '@/components';
+import type { AvatarId } from '@/lib/avatarCatalog';
+import { areaFromGeocoder, AREA_OPTIONS, generateNickname, validateNickname } from '@/lib/profileOptions';
 import { updateProfile } from '@/lib/api';
 import { useAppFlow } from '@/navigation/AppFlow';
-import { border, font, radius, space, useTheme } from '@/theme';
+import { space, useTheme } from '@/theme';
 
-const AGE_OPTIONS = [
-  { value: 'under_18', label: 'Under 18' },
-  { value: '18_24', label: '18–24' },
-  { value: '25_34', label: '25–34' },
-  { value: '35_44', label: '35–44' },
-  { value: '45_54', label: '45–54' },
-  { value: '55_plus', label: '55+' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
-] as const;
-
-const GENDER_OPTIONS = [
-  { value: 'woman', label: 'Woman' },
-  { value: 'man', label: 'Man' },
-  { value: 'non_binary', label: 'Non-binary' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
-] as const;
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('LOCATION_TIMEOUT')), milliseconds);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
+}
 
 export function ProfileSetupScreen() {
   const t = useTheme();
   const { finishProfileSetup } = useAppFlow();
+  const [nickname, setNickname] = useState(generateNickname());
+  const [avatarId, setAvatarId] = useState<AvatarId>('cat-ink');
+  const [spotterType, setSpotterType] = useState('casual');
   const [ageGroup, setAgeGroup] = useState<string>('');
-  const [gender, setGender] = useState<string>('prefer_not_to_say');
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [locationArea, setLocationArea] = useState('');
+  const [streakReminders, setStreakReminders] = useState(false);
+  const [careFlagReminders, setCareFlagReminders] = useState(false);
+  const [safetyPledge, setSafetyPledge] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState('');
@@ -37,39 +36,73 @@ export function ProfileSetupScreen() {
     setError('');
     setLocating(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      if (Platform.OS === 'web') {
+        setError('Automatic location is available in the mobile build. Type your city or area in this browser preview.');
+        return;
+      }
+      const permission = await withTimeout(Location.requestForegroundPermissionsAsync(), 6000);
       if (permission.status !== Location.PermissionStatus.GRANTED) throw new Error('LOCATION_PERMISSION_REQUIRED');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const places = await Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const lastKnown = await withTimeout(Location.getLastKnownPositionAsync(), 2500).catch(() => null);
+      const position = lastKnown ?? await withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), 8000);
+      const places = await withTimeout(Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude }), 8000);
       const place = places[0];
       const parts = [place?.district, place?.city, place?.subregion, place?.region].filter(Boolean).map(String);
-      const area = [...new Set(parts)].join(', ');
+      const area = areaFromGeocoder(parts);
       if (!area) throw new Error('LOCATION_AREA_NOT_FOUND');
       setLocationArea(area);
     } catch (e) {
       const code = e instanceof Error ? e.message : '';
-      setError(code === 'LOCATION_PERMISSION_REQUIRED' ? 'Location permission was not granted. You can type your city or area instead.' : 'We could not read your area. You can type it instead.');
+      setError(code === 'LOCATION_PERMISSION_REQUIRED' ? 'Location permission was not granted. You can type your city or area instead.' : code === 'LOCATION_TIMEOUT' ? 'Location lookup took too long. Type your city or area instead.' : 'We could not read your area. You can type it instead.');
     } finally {
       setLocating(false);
     }
   };
 
   const save = async () => {
+    const nicknameError = validateNickname(nickname);
+    if (nicknameError) {
+      setError(nicknameError);
+      return;
+    }
     if (!ageGroup) {
       setError('Choose an age group to continue.');
+      return;
+    }
+    if (ageGroup === 'under_13') {
+      setError('Pawprint is for people aged 13 and above.');
+      return;
+    }
+    if (ageGroup === '13_17' && !guardianConsent) {
+      setError('Parent or legal guardian permission is required for ages 13–17.');
+      return;
+    }
+    if (!AREA_OPTIONS.some((area) => area.toLowerCase() === locationArea.trim().toLowerCase())) {
+      setError('Choose a city or area from the suggestions. Exact addresses are not accepted.');
+      return;
+    }
+    if (!safetyPledge || !consentAccepted) {
+      setError('Accept the safety pledge and Terms & Privacy consent to continue.');
       return;
     }
     setError('');
     setBusy(true);
     try {
-      await updateProfile({
+      const savedProfile = await updateProfile({
+        displayName: nickname.trim(),
+        avatarUrl: avatarId,
+        catSpotterType: spotterType,
         ageGroup,
-        gender,
         locationArea,
+        guardianConsent,
+        streakReminders,
+        careFlagReminders,
+        safetyPledgeAccepted: safetyPledge,
+        termsAcceptedAt: new Date().toISOString(),
         onboardingCompleted: true,
-        privacyConsentVersion: '2026-10-21',
+        privacyConsentVersion: '2026-10-22',
         privacyConsentAt: new Date().toISOString(),
       });
+      if (!savedProfile.onboarding_completed) throw new Error('PROFILE_SAVE_NOT_CONFIRMED');
       finishProfileSetup();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your profile. Please try again.');
@@ -87,37 +120,14 @@ export function ProfileSetupScreen() {
             <AppText muted size={14} style={{ marginTop: space.xs, lineHeight: 20 }}>A few details help us personalize your experience. You can change them later in Profile.</AppText>
           </View>
 
-          <Card>
-            <View style={{ gap: space.md }}>
-              <View>
-                <AppText weight="bold" size={16}>How old are you?</AppText>
-                <AppText muted size={12} style={{ marginTop: 2 }}>We use an age group instead of your exact birthday.</AppText>
-              </View>
-              <OptionGrid options={AGE_OPTIONS} value={ageGroup} onChange={setAgeGroup} />
-            </View>
-          </Card>
-
-          <Card>
-            <View style={{ gap: space.md }}>
-              <View>
-                <AppText weight="bold" size={16}>How do you identify?</AppText>
-                <AppText muted size={12} style={{ marginTop: 2 }}>Optional. Choose “Prefer not to say” if you want.</AppText>
-              </View>
-              <OptionGrid options={GENDER_OPTIONS} value={gender} onChange={setGender} />
-            </View>
-          </Card>
-
-          <Card>
-            <View style={{ gap: space.md }}>
-              <View>
-                <AppText weight="bold" size={16}>Where do you usually spot cats?</AppText>
-                <AppText muted size={12} style={{ marginTop: 2 }}>City or area only—never enter an exact address.</AppText>
-              </View>
-              <TextInput value={locationArea} onChangeText={setLocationArea} placeholder="e.g. Alabang, Muntinlupa" placeholderTextColor={t.stone} autoCapitalize="words" style={{ borderWidth: border, borderColor: t.edge, borderRadius: radius.button, paddingHorizontal: space.md, paddingVertical: 13, backgroundColor: t.card, color: t.ink, fontFamily: font.medium, fontSize: 15 }} />
-              <Button small variant="ghost" label={locating ? 'Finding your area…' : 'Use my approximate area'} onPress={() => void useApproximateArea()} disabled={locating} />
-              <AppText muted size={11} style={{ lineHeight: 16 }}>Uses device location once to fill the area. Exact coordinates are not saved in your profile.</AppText>
-            </View>
-          </Card>
+          <ProfileDetailsForm
+            nickname={nickname} onNicknameChange={setNickname} onSuggestNickname={() => setNickname(generateNickname())}
+            avatarId={avatarId} onAvatarChange={setAvatarId} spotterType={spotterType} onSpotterTypeChange={setSpotterType}
+            ageGroup={ageGroup} onAgeChange={(value) => { setAgeGroup(value); setError(''); }} guardianConsent={guardianConsent} onGuardianConsentChange={(value) => { setGuardianConsent(value); setError(''); }}
+            locationArea={locationArea} onLocationChange={(value) => { setLocationArea(value); setError(''); }} onAreaSelect={(value) => { setLocationArea(value); setError(''); }} locating={locating} onUseLocation={() => void useApproximateArea()}
+            streakReminders={streakReminders} onStreakRemindersChange={setStreakReminders} careFlagReminders={careFlagReminders} onCareFlagRemindersChange={setCareFlagReminders}
+            safetyPledge={safetyPledge} onSafetyPledgeChange={setSafetyPledge} consentAccepted={consentAccepted} onConsentAcceptedChange={setConsentAccepted}
+          />
 
           <Card dark>
             <AppText color={t.amber} size={12} weight="bold" upper>Private by default</AppText>
@@ -129,21 +139,5 @@ export function ProfileSetupScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function OptionGrid({ options, value, onChange }: { options: readonly { value: string; label: string }[]; value: string; onChange: (value: string) => void }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-      {options.map((option) => {
-        const selected = value === option.value;
-        return (
-          <Pressable key={option.value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => onChange(option.value)} style={{ flexGrow: 1, minWidth: 108, borderWidth: border, borderColor: selected ? t.edge : t.line, borderRadius: radius.button, backgroundColor: selected ? t.amber : t.bg, paddingHorizontal: space.sm, paddingVertical: 10, alignItems: 'center' }}>
-            <AppText size={13} weight="semi" color={selected ? t.onAmber : t.ink} style={{ textAlign: 'center' }}>{option.label}</AppText>
-          </Pressable>
-        );
-      })}
-    </View>
   );
 }

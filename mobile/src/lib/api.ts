@@ -1,7 +1,21 @@
 import { supabase } from './supabase';
+import { Platform } from 'react-native';
 import type { CareFlag, CareNeed, CatVariant, Sighting } from './types';
 
 const apiBase = String(process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = 30000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('NETWORK_TIMEOUT');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!apiBase) throw new Error('MOBILE_API_NOT_CONFIGURED');
@@ -10,9 +24,9 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   headers.set('accept', 'application/json');
   if (!(init.body instanceof FormData)) headers.set('content-type', 'application/json');
   if (session?.access_token) headers.set('authorization', `Bearer ${session.access_token}`);
-  const response = await fetch(`${apiBase}${path}`, { ...init, headers });
+  const response = await fetchWithTimeout(`${apiBase}${path}`, { ...init, headers });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(String(data.error || `REQUEST_${response.status}`));
+  if (!response.ok) throw new Error(String(data.message || data.error || `REQUEST_${response.status}`));
   return data as T;
 }
 
@@ -52,6 +66,17 @@ export async function signUpWithPassword(email: string, password: string) {
   return data.session;
 }
 
+export async function requestPasswordReset(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: 'pawprint://auth/reset-password' });
+  if (error) throw error;
+}
+
+export async function changeEmail(email: string) {
+  const { data, error } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
+  if (error) throw error;
+  return data.user;
+}
+
 export async function signInWithProvider(provider: 'google' | 'apple') {
   const redirectTo = 'pawprint://auth/callback';
   const { data, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo, skipBrowserRedirect: true } });
@@ -76,6 +101,15 @@ export type Profile = {
   language?: string | null;
   visibility?: string;
   approximate_map?: boolean;
+  cat_spotter_type?: string | null;
+  streak_reminders?: boolean;
+  care_flag_reminders?: boolean;
+  safety_pledge_accepted?: boolean;
+  privacy_notice_version?: string | null;
+  privacy_consent_at?: string | null;
+  safety_pledge_at?: string | null;
+  terms_accepted_at?: string | null;
+  guardian_consent_at?: string | null;
 };
 
 export type Dashboard = {
@@ -102,11 +136,15 @@ export async function fetchProfile(): Promise<Profile> {
 export async function fetchDashboard(): Promise<Dashboard> { return apiRequest<Dashboard>('/api/dashboard'); }
 export async function fetchProgress(): Promise<Progress> { return apiRequest<Progress>('/api/progress'); }
 
-function variantOf(value: unknown): CatVariant {
-  const normalized = String(value ?? '').toLowerCase();
+function variantOf(...values: unknown[]): CatVariant {
+  const normalized = values.map((value) => String(value ?? '').toLowerCase()).join(' ');
   if (normalized.includes('calico')) return 'calico';
-  if (normalized.includes('black')) return 'black';
+  if (normalized.includes('black') || normalized.includes('tuxedo')) return 'black';
   return 'orange';
+}
+
+function validCoordinate(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }
 
 function dateLabel(value: unknown): string {
@@ -137,23 +175,29 @@ function expiresLabel(value: unknown): string {
 function mapSighting(row: any): Sighting {
   const capturedAt = row.capturedAt ?? row.captured_at;
   const area = row.area ?? {};
+  // Only use the delayed/rounded public area returned by the API.
+  // Exact latitude/longitude fields must never be rendered by the client.
+  const lat = Number(area.latitude);
+  const lng = Number(area.longitude);
   return {
-    id: String(row.id), variant: variantOf(row.catType ?? row.cat_type),
-    lat: Number(area.latitude ?? row.latitude ?? 0), lng: Number(area.longitude ?? row.longitude ?? 0),
-    when: dateLabel(capturedAt), mine: row.visibility !== 'public', seenCount: 1,
+    id: String(row.id), variant: variantOf(row.catType, row.cat_type, row.coatType, row.coat_type),
+    lat, lng,
+    when: dateLabel(capturedAt), mine: Boolean(row.isOwner ?? row.mine ?? row.visibility === 'private'), seenCount: Number(row.seenCount ?? 1),
     expiresIn: expiresLabel(row.expiresAt ?? row.expires_at), seenAgo: relativeLabel(capturedAt),
+    catBreed: row.catBreed ?? row.cat_breed ?? undefined,
+    description: row.description ?? undefined,
+    photoUrl: row.photoUrl ?? null,
+    emergency: Boolean(row.emergency),
+    capturedAt: capturedAt ? String(capturedAt) : undefined,
   };
 }
 
 /** Live pins from the authenticated Pawprint edge function. */
 export async function fetchSightings(): Promise<Sighting[]> {
-  const [result, own] = await Promise.all([
-    apiRequest<{ sightings: any[] }>('/api/sightings'),
-    apiRequest<{ sightings: any[] }>('/api/dashboard'),
-  ]);
-  const ownIds = new Set((own.sightings ?? []).map((item) => String(item.id)));
-  return (result.sightings ?? []).map((row) => mapSighting({ ...row, visibility: ownIds.has(String(row.id)) ? 'private' : row.visibility }))
-    .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+  const result = await apiRequest<{ sightings: any[] }>('/api/sightings');
+  return (result.sightings ?? [])
+    .map(mapSighting)
+    .filter((item) => validCoordinate(item.lat, -90, 90) && validCoordinate(item.lng, -180, 180));
 }
 
 function careNeed(value: unknown): CareNeed {
@@ -171,12 +215,12 @@ export async function fetchCareFlags(): Promise<CareFlag[]> {
   const result = await apiRequest<{ flags: any[] }>('/api/care-flags');
   return (result.flags ?? []).map((row) => ({
     id: String(row.id), sightingId: row.sighting_id ? String(row.sighting_id) : undefined, need: careNeed(row.kind ?? row.need), note: String(row.note ?? ''),
-    where: 'Approximate area', variant: variantOf(row.sightings?.cat_type ?? row.cat_type), mine: true,
+    where: 'Approximate area', variant: variantOf(row.sightings?.cat_type, row.cat_type), mine: true,
   }));
 }
 
 export type NewSighting = {
-  photoUri: string; showPin: boolean; latitude: number; longitude: number; description: string;
+  photoUri: string; captureSource?: 'camera' | 'gallery'; showPin: boolean; latitude?: number; longitude?: number; description: string;
   capturedAt?: string; deviceTimeZone?: string;
 };
 
@@ -187,22 +231,33 @@ export async function submitSighting(input: NewSighting): Promise<SubmittedSight
   const capture = await apiRequest<{ sessionId: string }>('/api/capture-sessions', {
     method: 'POST', body: JSON.stringify({
       deviceTimeZone: input.deviceTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Asia/Manila',
-      cameraPermission: 'granted', locationPermission: 'granted',
+      cameraPermission: input.captureSource === 'gallery' ? 'not_used' : 'granted',
+      locationPermission: input.captureSource === 'gallery' ? 'not_used' : 'granted',
     }),
   });
   const auth = (await supabase.auth.getSession()).data.session;
   if (!auth?.access_token) throw new Error('AUTH_REQUIRED');
   const form = new FormData();
-  form.append('photo', { uri: input.photoUri, name: `pawprint-${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+  if (Platform.OS === 'web' && /^(blob:|data:)/.test(input.photoUri)) {
+    const photoResponse = await fetch(input.photoUri);
+    if (!photoResponse.ok) throw new Error('PHOTO_READ_FAILED');
+    const photoBlob = await photoResponse.blob();
+    form.append('photo', photoBlob, `pawprint-${Date.now()}.${photoBlob.type.split('/')[1] || 'jpg'}`);
+  } else {
+    form.append('photo', { uri: input.photoUri, name: `pawprint-${Date.now()}.jpg`, type: 'image/jpeg' } as any);
+  }
   form.append('captureSessionId', capture.sessionId);
   form.append('idempotencyKey', `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   form.append('description', input.description.trim());
-  form.append('latitude', String(input.latitude)); form.append('longitude', String(input.longitude));
+  if (Number.isFinite(input.latitude) && Number.isFinite(input.longitude)) {
+    form.append('latitude', String(input.latitude)); form.append('longitude', String(input.longitude));
+  }
   form.append('capturedAt', input.capturedAt ?? new Date().toISOString());
+  form.append('captureSource', input.captureSource ?? 'camera');
   form.append('visibility', input.showPin ? 'public' : 'private');
-  const response = await fetch(`${apiBase}/api/sightings`, {
+  const response = await fetchWithTimeout(`${apiBase}/api/sightings`, {
     method: 'POST', headers: { accept: 'application/json', authorization: `Bearer ${auth.access_token}` }, body: form,
-  });
+  }, 45000);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(String(data.error || `REQUEST_${response.status}`));
   const variant = variantOf(data.catType);
@@ -215,6 +270,22 @@ export async function submitSighting(input: NewSighting): Promise<SubmittedSight
 
 export async function raiseCareFlag(sightingId: string, need: CareNeed, note: string): Promise<void> {
   await apiRequest('/api/care-flags', { method: 'POST', body: JSON.stringify({ sightingId, kind: need, note }) });
+}
+
+export async function reportContent(targetType: 'sighting' | 'care_flag' | 'profile', targetId: string, reason = 'other', note = '') {
+  await apiRequest('/api/reports', { method: 'POST', body: JSON.stringify({ targetType, targetId, reason, note }) });
+}
+
+export async function blockContent(targetType: 'sighting' | 'care_flag' | 'profile', targetId: string) {
+  await apiRequest('/api/blocks', { method: 'POST', body: JSON.stringify({ targetType, targetId }) });
+}
+
+export async function markSightingSeen(sightingId: string) {
+  return apiRequest<{ status: string }>('/api/sightings/seen', { method: 'POST', body: JSON.stringify({ sightingId }) });
+}
+
+export async function deleteAccount() {
+  await apiRequest('/api/account', { method: 'DELETE' });
 }
 
 export async function createRescueRequest(sightingId: string | undefined, need: CareNeed, note = ''): Promise<void> {

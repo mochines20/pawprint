@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import * as Location from 'expo-location';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, Button, Card, CatAvatar, Chip, Icon, PinMarker, ProgressBar } from '@/components';
+import { AppText, Button, Card, CatAvatar, Chip, Icon, PinMarker, ProfileDetailsForm, ProgressBar } from '@/components';
+import type { AvatarId } from '@/lib/avatarCatalog';
+import { areaFromGeocoder, AREA_OPTIONS, generateNickname, validateNickname } from '@/lib/profileOptions';
 import { updateProfile } from '@/lib/api';
 import { useAppFlow } from '@/navigation/AppFlow';
-import { border, font, radius, space, useTheme } from '@/theme';
-import logo from '../../assets/logo.png';
+import { space, useTheme } from '@/theme';
 
 type Slide = { title: string; body: string; art?: () => React.ReactElement; kind?: 'profile' };
 
@@ -53,7 +54,7 @@ function JournalArt() {
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <CatAvatar variant="orange" size={44} />
-          <View style={{ flex: 1 }}><AppText size={14.5} weight="semi">Orange tabby</AppText><AppText size={12} muted>Today · Alabang</AppText></View>
+          <View style={{ flex: 1 }}><AppText size={14.5} weight="semi">Orange tabby</AppText><AppText size={12} muted>Today · Muntinlupa</AppText></View>
           <Chip tone="amber" label="+24 XP" />
         </View>
         <View style={{ marginTop: 10 }}><ProgressBar value={72} /></View>
@@ -71,7 +72,7 @@ function CareArt() {
         <View style={{ flex: 1 }}>
           <Chip tone="red" label="Care Flag" />
           <AppText size={14} weight="semi" style={{ marginTop: 8 }}>Needs water &amp; shade</AppText>
-          <AppText size={12} muted>approximate Alabang area</AppText>
+          <AppText size={12} muted>approximate Muntinlupa area</AppText>
         </View>
         <View style={{ position: 'absolute', right: -2, top: -10 }}><PinMarker size={40} fill={t.red} /></View>
       </Card>
@@ -88,50 +89,22 @@ function CareArt() {
   );
 }
 
-const AGE_OPTIONS = [
-  ['under_18', 'Under 18'], ['18_24', '18–24'], ['25_34', '25–34'], ['35_44', '35–44'],
-  ['45_54', '45–54'], ['55_plus', '55+'], ['prefer_not_to_say', 'Prefer not to say'],
-] as const;
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('LOCATION_TIMEOUT')), milliseconds);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
+}
 
-const GENDER_OPTIONS = [
-  ['woman', 'Woman'], ['man', 'Man'], ['non_binary', 'Non-binary'], ['prefer_not_to_say', 'Prefer not to say'],
-] as const;
-
-function ProfileStep({ ageGroup, gender, locationArea, locating, onAgeChange, onGenderChange, onLocationChange, onUseLocation }: { ageGroup: string; gender: string; locationArea: string; locating: boolean; onAgeChange: (value: string) => void; onGenderChange: (value: string) => void; onLocationChange: (value: string) => void; onUseLocation: () => void }) {
-  const t = useTheme();
-  const optionStyle = (selected: boolean) => ({ flexGrow: 1, minWidth: 100, borderWidth: border, borderColor: selected ? t.edge : t.line, borderRadius: radius.button, backgroundColor: selected ? t.amber : t.card, paddingHorizontal: 8, paddingVertical: 9, alignItems: 'center' as const });
-  return (
-    <ScrollView style={{ width: '100%' }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
-      <View style={{ alignItems: 'center', marginBottom: 2 }}>
-        <View style={{ width: 56, height: 56, borderWidth: border, borderColor: t.edge, borderRadius: 18, backgroundColor: t.card, alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={logo} style={{ width: 42, height: 42, tintColor: t.ink }} resizeMode="contain" accessibilityLabel="Pawprint logo" />
-        </View>
-      </View>
-      <AppText size={26} weight="bold" style={{ textAlign: 'center' }}>Make Pawprint yours</AppText>
-      <AppText muted size={13} style={{ textAlign: 'center', lineHeight: 18, marginBottom: 4 }}>A few details help us personalize your experience. We use an age group and approximate area—not your exact address.</AppText>
-      <Card>
-        <AppText size={14} weight="bold">How old are you?</AppText>
-        <AppText muted size={11.5} style={{ marginTop: 2 }}>Choose an age group instead of your exact birthday.</AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
-          {AGE_OPTIONS.map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: ageGroup === value }} onPress={() => onAgeChange(value)} style={optionStyle(ageGroup === value)}><AppText size={11.5} weight="semi" color={ageGroup === value ? t.onAmber : t.ink}>{label}</AppText></Pressable>)}
-        </View>
-      </Card>
-      <Card>
-        <AppText size={14} weight="bold">How do you identify?</AppText>
-        <AppText muted size={11.5} style={{ marginTop: 2 }}>Optional. You can choose not to say.</AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
-          {GENDER_OPTIONS.map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: gender === value }} onPress={() => onGenderChange(value)} style={optionStyle(gender === value)}><AppText size={11.5} weight="semi" color={gender === value ? t.onAmber : t.ink}>{label}</AppText></Pressable>)}
-        </View>
-      </Card>
-      <Card>
-        <AppText size={14} weight="bold">Where do you usually spot cats?</AppText>
-        <AppText muted size={11.5} style={{ marginTop: 2 }}>City or area only—never enter an exact address.</AppText>
-        <TextInput value={locationArea} onChangeText={onLocationChange} placeholder="e.g. Alabang, Muntinlupa" placeholderTextColor={t.stone} autoCapitalize="words" style={{ marginTop: 9, borderWidth: border, borderColor: t.edge, borderRadius: radius.button, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: t.card, color: t.ink, fontFamily: font.medium, fontSize: 14 }} />
-        <Button small variant="ghost" label={locating ? 'Finding your area…' : 'Use my approximate area'} onPress={onUseLocation} disabled={locating} style={{ marginTop: 8 }} />
-        <AppText muted size={11} style={{ lineHeight: 16 }}>Pawprint uses your device location once to fill this area. Exact coordinates are not saved as profile data.</AppText>
-      </Card>
-    </ScrollView>
-  );
+function ProfileStep(props: {
+  nickname: string; onNicknameChange: (value: string) => void; onSuggestNickname: () => void;
+  avatarId: AvatarId; onAvatarChange: (value: AvatarId) => void; spotterType: string; onSpotterTypeChange: (value: string) => void;
+  ageGroup: string; onAgeChange: (value: string) => void; guardianConsent: boolean; onGuardianConsentChange: (value: boolean) => void;
+  locationArea: string; onLocationChange: (value: string) => void; onAreaSelect: (value: string) => void; locating: boolean; onUseLocation: () => void;
+  streakReminders: boolean; onStreakRemindersChange: (value: boolean) => void; careFlagReminders: boolean; onCareFlagRemindersChange: (value: boolean) => void;
+  safetyPledge: boolean; onSafetyPledgeChange: (value: boolean) => void; consentAccepted: boolean; onConsentAcceptedChange: (value: boolean) => void;
+}) {
+  return <ScrollView style={{ width: '100%' }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }} keyboardShouldPersistTaps="handled"><ProfileDetailsForm {...props} /></ScrollView>;
 }
 
 const SLIDES: Slide[] = [
@@ -149,9 +122,16 @@ export function OnboardingScreen() {
   const { finishOnboarding, finishProfileSetup } = useAppFlow();
   const list = useRef<FlatList<Slide>>(null);
   const [i, setI] = useState(0);
+  const [nickname, setNickname] = useState(generateNickname());
+  const [avatarId, setAvatarId] = useState<AvatarId>('cat-ink');
+  const [spotterType, setSpotterType] = useState('casual');
   const [ageGroup, setAgeGroup] = useState('');
-  const [gender, setGender] = useState('prefer_not_to_say');
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [locationArea, setLocationArea] = useState('');
+  const [streakReminders, setStreakReminders] = useState(false);
+  const [careFlagReminders, setCareFlagReminders] = useState(false);
+  const [safetyPledge, setSafetyPledge] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState('');
@@ -159,14 +139,37 @@ export function OnboardingScreen() {
 
   const next = async () => {
     if (last) {
+      const nicknameError = validateNickname(nickname);
+      if (nicknameError) {
+        setError(nicknameError);
+        return;
+      }
       if (!ageGroup) {
         setError('Choose an age group to continue.');
+        return;
+      }
+      if (ageGroup === 'under_13') {
+        setError('Pawprint is for people aged 13 and above.');
+        return;
+      }
+      if (ageGroup === '13_17' && !guardianConsent) {
+        setError('Parent or legal guardian permission is required for ages 13–17.');
+        return;
+      }
+      if (!AREA_OPTIONS.some((area) => area.toLowerCase() === locationArea.trim().toLowerCase())) {
+        setError('Choose a city or area from the suggestions. Exact addresses are not accepted.');
+        return;
+      }
+      if (!safetyPledge || !consentAccepted) {
+        setError('Accept the safety pledge and Terms & Privacy consent to continue.');
         return;
       }
       setSaving(true);
       setError('');
       try {
-        await updateProfile({ ageGroup, gender, locationArea, onboardingCompleted: true, privacyConsentVersion: '2026-10-21', privacyConsentAt: new Date().toISOString() });
+        const now = new Date().toISOString();
+        const savedProfile = await updateProfile({ displayName: nickname.trim(), avatarUrl: avatarId, catSpotterType: spotterType, ageGroup, locationArea, guardianConsent, streakReminders, careFlagReminders, safetyPledgeAccepted: safetyPledge, termsAcceptedAt: now, onboardingCompleted: true, privacyConsentVersion: '2026-10-22', privacyConsentAt: now });
+        if (!savedProfile.onboarding_completed) throw new Error('PROFILE_SAVE_NOT_CONFIRMED');
         finishProfileSetup();
         finishOnboarding();
       } catch (e) {
@@ -192,18 +195,23 @@ export function OnboardingScreen() {
     setError('');
     setLocating(true);
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
+      if (Platform.OS === 'web') {
+        setError('Automatic location is available in the mobile build. Type your city or area in this browser preview.');
+        return;
+      }
+      const permission = await withTimeout(Location.requestForegroundPermissionsAsync(), 6000);
       if (permission.status !== Location.PermissionStatus.GRANTED) throw new Error('LOCATION_PERMISSION_REQUIRED');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const places = await Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      const lastKnown = await withTimeout(Location.getLastKnownPositionAsync(), 2500).catch(() => null);
+      const position = lastKnown ?? await withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), 8000);
+      const places = await withTimeout(Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude }), 8000);
       const place = places[0];
       const parts = [place?.district, place?.city, place?.subregion, place?.region].filter(Boolean).map(String);
-      const area = [...new Set(parts)].join(', ');
+      const area = areaFromGeocoder(parts);
       if (!area) throw new Error('LOCATION_AREA_NOT_FOUND');
       setLocationArea(area);
     } catch (e) {
       const code = e instanceof Error ? e.message : '';
-      setError(code === 'LOCATION_PERMISSION_REQUIRED' ? 'Location permission was not granted. You can type your city or area instead.' : 'We could not read your area. You can type it instead.');
+      setError(code === 'LOCATION_PERMISSION_REQUIRED' ? 'Location permission was not granted. You can type your city or area instead.' : code === 'LOCATION_TIMEOUT' ? 'Location lookup took too long. Type your city or area instead.' : 'We could not read your area. You can type it instead.');
     } finally {
       setLocating(false);
     }
@@ -230,7 +238,7 @@ export function OnboardingScreen() {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width, flex: 1 }}>
               <View style={{ flex: 1, alignItems: 'center', justifyContent: item.kind === 'profile' ? 'flex-start' : 'center', paddingHorizontal: item.kind === 'profile' ? 18 : 28, paddingTop: item.kind === 'profile' ? 8 : 0, gap: 6 }}>
                 {item.kind === 'profile' ? (
-                  <ProfileStep ageGroup={ageGroup} gender={gender} locationArea={locationArea} locating={locating} onAgeChange={setAgeGroup} onGenderChange={setGender} onLocationChange={setLocationArea} onUseLocation={() => void useApproximateArea()} />
+                  <ProfileStep nickname={nickname} onNicknameChange={(value) => { setNickname(value); setError(''); }} onSuggestNickname={() => { setNickname(generateNickname()); setError(''); }} avatarId={avatarId} onAvatarChange={setAvatarId} spotterType={spotterType} onSpotterTypeChange={setSpotterType} ageGroup={ageGroup} onAgeChange={(value) => { setAgeGroup(value); setError(''); }} guardianConsent={guardianConsent} onGuardianConsentChange={(value) => { setGuardianConsent(value); setError(''); }} locationArea={locationArea} onLocationChange={(value) => { setLocationArea(value); setError(''); }} onAreaSelect={(value) => { setLocationArea(value); setError(''); }} locating={locating} onUseLocation={() => void useApproximateArea()} streakReminders={streakReminders} onStreakRemindersChange={setStreakReminders} careFlagReminders={careFlagReminders} onCareFlagRemindersChange={setCareFlagReminders} safetyPledge={safetyPledge} onSafetyPledgeChange={setSafetyPledge} consentAccepted={consentAccepted} onConsentAcceptedChange={setConsentAccepted} />
                 ) : (
                   <><View style={{ marginBottom: 18 }}>{Art ? <Art /> : null}</View><AppText size={30} weight="bold" style={{ textAlign: 'center' }}>{item.title}</AppText><AppText size={16} muted style={{ textAlign: 'center', maxWidth: 300, marginTop: 6 }}>{item.body}</AppText></>
                 )}

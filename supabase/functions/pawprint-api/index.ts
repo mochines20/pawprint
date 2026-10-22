@@ -1,6 +1,9 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { sendPushNotification } from "npm:@mmmike/web-push@1.0.1/send";
+import jpeg from "npm:jpeg-js@0.4.4";
 import { pawprintEmailTemplate } from "./email-templates.ts";
+import { dHashFromRgba, hammingDistance } from "./dhash.ts";
+import { stagingValidationFixture } from "./staging-fixture.ts";
 
 const headers = {
   "access-control-allow-origin": "*",
@@ -21,6 +24,10 @@ const bearer = (request: Request) => request.headers.get("authorization")?.repla
 
 function adminIds() {
   return new Set(String(Deno.env.get("ADMIN_USER_IDS") || "").split(",").map((item) => item.trim()).filter(Boolean));
+}
+
+function isAdmin(user: { id: string; app_metadata?: Record<string, unknown> | null }) {
+  return adminIds().has(user.id) || user.app_metadata?.role === "admin";
 }
 
 function createServiceClient() {
@@ -48,6 +55,12 @@ function normalizedCat(value: unknown) {
   return text || "Unclassified cat";
 }
 
+const MOBILE_AREAS = ["Muntinlupa", "Makati", "Manila", "Quezon City", "Pasig", "Taguig", "Cebu City", "Davao City", "Iloilo City", "Baguio", "Antipolo", "Cagayan de Oro", "Bacolod", "Other city or area"];
+const NICKNAME_WORDS = ["asshole", "bitch", "fuck", "gago", "pota", "putang", "shit", "tanga", "ulol"];
+function nicknameInvalid(value: string) {
+  return !/^[A-Za-z0-9_]{3,20}$/.test(value) || /^\S+@\S+\.\S+$/.test(value) || /(?:\+?\d[\d\s().-]{6,}\d)/.test(value) || NICKNAME_WORDS.some((word) => value.toLowerCase().includes(word));
+}
+
 function geohash(latitude: number, longitude: number, precision = 6) {
   const alphabet = "0123456789bcdefghjkmnpqrstuvwxyz";
   let lat = [-90, 90], lon = [-180, 180], even = true, bits = 0, character = 0, output = "";
@@ -60,6 +73,25 @@ function geohash(latitude: number, longitude: number, precision = 6) {
     if (bits === 5) { output += alphabet[character]; bits = 0; character = 0; }
   }
   return output;
+}
+
+function geohashCenter(value: unknown) {
+  const text = String(value || '').toLowerCase();
+  const alphabet = "0123456789bcdefghjkmnpqrstuvwxyz";
+  if (!text) return null;
+  let lat = [-90, 90], lon = [-180, 180], even = true;
+  for (const character of text) {
+    const index = alphabet.indexOf(character);
+    if (index < 0) return null;
+    for (let bit = 4; bit >= 0; bit -= 1) {
+      const range = even ? lon : lat;
+      const middle = (range[0] + range[1]) / 2;
+      if ((index & (1 << bit)) !== 0) range[0] = middle;
+      else range[1] = middle;
+      even = !even;
+    }
+  }
+  return { latitude: (lat[0] + lat[1]) / 2, longitude: (lon[0] + lon[1]) / 2 };
 }
 
 function rarity(catType: string) {
@@ -80,6 +112,18 @@ async function hash(bytes: Uint8Array) {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+// A 64-bit dHash catches visually identical or lightly recompressed photos
+// even when their exact SHA-256 bytes differ. It is only used as an abuse
+// signal; the original photo is still retained for the user's own Journal.
+function perceptualHash(bytes: Uint8Array) {
+  try {
+    const decoded = jpeg.decode(bytes, { useTArray: true });
+    return decoded?.data && decoded.width && decoded.height ? dHashFromRgba(decoded.data, decoded.width, decoded.height) : null;
+  } catch {
+    return null;
+  }
+}
+
 const validationPrompt = "Inspect this camera capture for Pawprint. Return JSON only with catDetected, personDetected, screenshotDetected, unsafe, aiGenerated, catConfidence, breedConfidence, aiGeneratedConfidence, suggestedBreed, suggestedCoatType, reason. Accept only a clearly visible real cat photographed by a camera. Reject people, screenshots, collages, cartoons, drawings, logos, illustrations, rendered mockups, and images without a clearly visible real cat. Do not call a normal cat AI-generated. Suggest a breed only when supported.";
 
 function normalizeValidation(result: Record<string, unknown>) {
@@ -98,7 +142,10 @@ function normalizeValidation(result: Record<string, unknown>) {
   else if (screenshotDetected) { status = "rejected"; reason = "SCREENSHOT_DETECTED"; }
   else if (!catDetected || catConfidence < threshold) { status = "rejected"; reason = "IMAGE_NOT_A_CAT"; }
   else if (aiGenerated && aiConfidence >= aiThreshold) { status = "rejected"; reason = "AI_GENERATED_IMAGE"; }
-  else if (catConfidence < Math.min(0.9, threshold + 0.1) || aiConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
+  // Respect the configured cat threshold directly. The old implicit +0.10
+  // review band caused clear real-cat photos around 0.80–0.89 to be stored
+  // as needs_review even though they passed AI_CAT_CONFIDENCE_THRESHOLD.
+  else if (aiConfidence >= 0.35) { status = "needs_review"; reason = "VALIDATION_PENDING"; }
   const breed = typeof result.suggestedBreed === "string" ? String(result.suggestedBreed).slice(0, 80) : "";
   const coat = typeof result.suggestedCoatType === "string" ? String(result.suggestedCoatType).slice(0, 80) : "";
   return { status, reason, catDetected, personDetected, screenshotDetected, unsafe, aiGenerated, catConfidence, aiConfidence, catType: normalizedCat(breed || coat), catBreed: breed || null, coatType: coat || null, detail: String(result.reason || "").slice(0, 500) };
@@ -110,6 +157,8 @@ function parseModelJson(value: string) {
 }
 
 async function validatePhoto(bytes: Uint8Array, contentType: string) {
+  const fixture = stagingValidationFixture();
+  if (fixture) return normalizeValidation(fixture);
   const provider = String(Deno.env.get("AI_PROVIDER") || "gemini").toLowerCase();
   const encoded = bytesToBase64(bytes);
   const unavailable = (detail: string) => ({ status: "needs_review", reason: "AI_PROVIDER_UNAVAILABLE", catDetected: false, personDetected: false, screenshotDetected: false, unsafe: false, aiGenerated: false, catConfidence: 0, aiConfidence: 0, catType: "Unclassified cat", catBreed: null, coatType: null, detail: detail.slice(0, 500) });
@@ -207,6 +256,15 @@ async function sendBrevoAuthCode(email: string, code: string) {
   return { sent: true };
 }
 
+async function removeBrevoContact(email: string) {
+  const key = Deno.env.get("BREVO_API_KEY");
+  if (!key || !email) return;
+  const result = await fetch(`https://api.brevo.com/v3/contacts/${encodeURIComponent(email)}`, { method: "DELETE", headers: { "api-key": key } });
+  // Brevo returns 404 when the address was never on the list. Deletion must
+  // remain retryable, so that state is treated as already complete.
+  if (!result.ok && result.status !== 404) throw new Error(`BREVO_DELETE_${result.status}`);
+}
+
 function createPublicAuthClient() {
   return createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_ANON_KEY") || "", { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 }
@@ -216,7 +274,7 @@ function pushVapid() {
   const privateKey = Deno.env.get("PUSH_PRIVATE_KEY");
   if (!publicKey || !privateKey) return null;
   return {
-    subject: Deno.env.get("PUSH_SUBJECT") || "https://pawprint.madison88-0851.chatgpt.site",
+    subject: Deno.env.get("PUSH_SUBJECT") || "https://pawprint-omega.vercel.app",
     publicKey,
     privateKey,
   };
@@ -260,10 +318,26 @@ async function requireUser(request: Request, supabase: SupabaseClient) {
   try { return await currentUser(request, supabase); } catch { throw new Error("AUTH_REQUIRED"); }
 }
 
+async function resolveTargetUserId(supabase: SupabaseClient, body: Record<string, unknown>) {
+  if (body.blockedUserId) return String(body.blockedUserId);
+  const targetType = String(body.targetType || "");
+  const targetId = String(body.targetId || "");
+  if (!targetId) return null;
+  if (targetType === "sighting" || targetType === "pin") {
+    const result = await supabase.from("sightings").select("user_id").eq("id", targetId).maybeSingle();
+    return result.data?.user_id || null;
+  }
+  if (targetType === "care_flag") {
+    const result = await supabase.from("care_flags").select("user_id").eq("id", targetId).maybeSingle();
+    return result.data?.user_id || null;
+  }
+  return targetType === "profile" ? targetId : null;
+}
+
 async function profile(supabase: SupabaseClient, user: { id: string; email?: string }) {
   const userProfile = await ensureProfile(supabase, user);
   const settings = await supabase.from("user_settings").select("*").eq("user_id", user.id).maybeSingle();
-  return { id: user.id, email: user.email || null, display_name: userProfile.nickname, avatar_url: userProfile.avatar, age_group: userProfile.age_group, gender: userProfile.gender || null, location_area: userProfile.location_area || null, onboarding_completed: Boolean(userProfile.onboarding_completed), time_zone: userProfile.time_zone || "Asia/Manila", language: userProfile.language || "en", ...(settings.data || {}) };
+  return { id: user.id, email: user.email || null, display_name: userProfile.nickname, avatar_url: userProfile.avatar, age_group: userProfile.age_group, gender: userProfile.gender || null, location_area: userProfile.location_area || null, onboarding_completed: Boolean(userProfile.onboarding_completed), time_zone: userProfile.time_zone || "Asia/Manila", language: userProfile.language || "en", privacy_notice_version: userProfile.privacy_notice_version || null, privacy_consent_at: userProfile.privacy_consent_at || null, cat_spotter_type: userProfile.cat_spotter_type || "casual", streak_reminders: Boolean(userProfile.streak_reminders), care_flag_reminders: Boolean(userProfile.care_flag_reminders), safety_pledge_accepted: Boolean(userProfile.safety_pledge_accepted), safety_pledge_at: userProfile.safety_pledge_at || null, terms_accepted_at: userProfile.terms_accepted_at || null, guardian_consent_at: userProfile.guardian_consent_at || null, visibility: settings.data?.default_visibility === "private" ? "private" : "public", ...(settings.data || {}) };
 }
 
 async function dashboard(supabase: SupabaseClient, user: { id: string }) {
@@ -278,7 +352,12 @@ async function dashboard(supabase: SupabaseClient, user: { id: string }) {
 }
 
 function toSighting(item: Record<string, unknown>) {
-  return { id: item.id, catType: item.cat_type, description: item.description, capturedAt: item.captured_at, publishedAt: item.published_at, expiresAt: item.expires_at, visibility: item.visibility, area: { latitude: Number(item.latitude), longitude: Number(item.longitude) }, validationStatus: item.validation_status };
+  // Never return the capture-time coordinates. Public map coordinates are the
+  // stable centre of the stored public geohash, which prevents trilateration
+  // across repeated sightings.
+  const publicPoint = geohashCenter(item.public_geohash);
+  const seen = Array.isArray(item.sighting_seen) ? Number((item.sighting_seen[0] as Record<string, unknown>)?.count || 0) : Number(item.seen_count || 0);
+  return { id: item.id, catType: item.cat_type, description: item.description, capturedAt: item.captured_at, publishedAt: item.published_at, expiresAt: item.expires_at, visibility: item.visibility, area: publicPoint, seenCount: seen, validationStatus: item.validation_status };
 }
 
 async function progress(supabase: SupabaseClient, user: { id: string }) {
@@ -299,44 +378,62 @@ async function createSighting(request: Request, supabase: SupabaseClient, user: 
   const sessionId = String(form.get("captureSessionId") || "");
   const requestKey = String(form.get("idempotencyKey") || "");
   const description = String(form.get("description") || "").trim().slice(0, 280);
-  const latitude = Number(form.get("latitude")), longitude = Number(form.get("longitude"));
-  if (!(photo instanceof File) || !photo.type.startsWith("image/") || photo.size > 10 * 1024 * 1024 || !sessionId || !requestKey || description.length < 8 || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return errorResponse("INVALID_SIGHTING", 400);
+  const captureSource = String(form.get("captureSource") || "camera") === "gallery" ? "gallery" : "camera";
+  const latitudeValue = form.get("latitude"), longitudeValue = form.get("longitude");
+  const latitude = latitudeValue === null ? null : Number(latitudeValue), longitude = longitudeValue === null ? null : Number(longitudeValue);
+  if (!(photo instanceof File) || !photo.type.startsWith("image/") || photo.size > 10 * 1024 * 1024 || !sessionId || !requestKey || description.length < 8 || (captureSource === "camera" && (!Number.isFinite(latitude) || !Number.isFinite(longitude)))) return errorResponse("INVALID_SIGHTING", 400);
   const previous = await supabase.from("request_keys").select("response_json").eq("user_id", user.id).eq("request_key", requestKey).maybeSingle();
   if (previous.data?.response_json) return response(previous.data.response_json, 201);
   const session = await supabase.from("capture_sessions").select("*").eq("id", sessionId).eq("user_id", user.id).maybeSingle();
   if (!session.data || session.data.used_at || new Date(session.data.expires_at) <= new Date()) return errorResponse("CAPTURE_SESSION_INVALID", 409);
-  const daily = await supabase.from("sightings").select("id", { count: "exact", head: true }).eq("user_id", user.id).gte("uploaded_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  if ((daily.count || 0) >= 20) return errorResponse("RATE_LIMITED", 429);
+  const reservation = await supabase.rpc("reserve_sighting_attempt", { target_user: user.id, target_request_key: requestKey });
+  if (reservation.error) throw reservation.error;
+  if (!reservation.data?.allowed) {
+    return reservation.data?.reason === "daily_limit"
+      ? errorResponse("DAILY_VALIDATION_LIMIT", 429, { message: "Daily photo validation limit reached. Please try again tomorrow." })
+      : errorResponse("RATE_LIMITED", 429, { message: "You have reached the hourly photo limit. Please try again later." });
+  }
   const capturedAt = Date.parse(String(form.get("capturedAt") || ""));
   if (!Number.isFinite(capturedAt) || Date.now() - capturedAt > 10 * 60 * 1000 || capturedAt > Date.now() + 120000) return errorResponse("CAPTURE_TIME_INVALID", 409);
-  const bytes = new Uint8Array(await photo.arrayBuffer()), photoHash = await hash(bytes);
+  const bytes = new Uint8Array(await photo.arrayBuffer()), photoHash = await hash(bytes), photoDhash = perceptualHash(bytes);
   const duplicate = await supabase.from("sightings").select("id").eq("photo_hash", photoHash).maybeSingle();
   if (duplicate.data) return errorResponse("DUPLICATE_IMAGE", 409, { duplicateOf: duplicate.data.id });
+  if (photoDhash) {
+    const recent = await supabase.from("sightings").select("id,photo_dhash").eq("user_id", user.id).not("photo_dhash", "is", null).gte("uploaded_at", new Date(Date.now() - 7 * 86400000).toISOString()).limit(500);
+    if (recent.error) throw recent.error;
+    const similar = (recent.data || []).find((item) => hammingDistance(photoDhash, String(item.photo_dhash)) <= 6);
+    if (similar) return errorResponse("SIMILAR_IMAGE", 409, { duplicateOf: similar.id, message: "That photo looks too similar to one you uploaded recently." });
+  }
   const validation = await validatePhoto(bytes, photo.type);
   const sightingId = id(), storagePath = `${user.id}/${sightingId}.jpg`, uploaded = await supabase.storage.from("pawprint-sightings").upload(storagePath, bytes, { contentType: photo.type || "image/jpeg", upsert: false });
   if (uploaded.error) throw uploaded.error;
   const uploadedAt = new Date(), publishedAt = new Date(uploadedAt.getTime() + 5 * 60 * 1000), expiresAt = new Date(uploadedAt.getTime() + 24 * 60 * 60 * 1000), catType = normalizedCat(validation.catType);
-  const row = await supabase.from("sightings").insert({ id: sightingId, user_id: user.id, storage_path: storagePath, photo_hash: photoHash, cat_type: catType, cat_breed: validation.catBreed, coat_type: validation.coatType, cat_confidence: validation.catConfidence, ai_confidence: validation.catConfidence, ai_generated: validation.aiGenerated, ai_generated_confidence: validation.aiConfidence, validation_json: validation, description, validation_status: validation.status, validation_reason: validation.reason, visibility: String(form.get("visibility") || "friends"), latitude, longitude, public_geohash: geohash(latitude, longitude, rarity(catType) === "Rare" ? 4 : 6), captured_at: new Date(capturedAt).toISOString(), uploaded_at: uploadedAt.toISOString(), published_at: publishedAt.toISOString(), expires_at: expiresAt.toISOString() }).select("*").single();
+  const settings = await supabase.from("user_settings").select("default_visibility").eq("user_id", user.id).maybeSingle();
+  const requestedVisibility = String(form.get("visibility") || "public");
+  const visibility = requestedVisibility === "private" || settings.data?.default_visibility === "private" ? "private" : "public";
+  const row = await supabase.from("sightings").insert({ id: sightingId, user_id: user.id, storage_path: storagePath, photo_hash: photoHash, photo_dhash: photoDhash, cat_type: catType, cat_breed: validation.catBreed, coat_type: validation.coatType, cat_confidence: validation.catConfidence, ai_confidence: validation.catConfidence, ai_generated: validation.aiGenerated, ai_generated_confidence: validation.aiConfidence, validation_json: validation, description, capture_source: captureSource, validation_status: validation.status, validation_reason: validation.reason, visibility: captureSource === "gallery" ? "private" : visibility, latitude: captureSource === "camera" ? latitude : null, longitude: captureSource === "camera" ? longitude : null, public_geohash: captureSource === "camera" ? geohash(Number(latitude), Number(longitude), 7) : null, captured_at: new Date(capturedAt).toISOString(), uploaded_at: uploadedAt.toISOString(), published_at: publishedAt.toISOString(), expires_at: expiresAt.toISOString() }).select("*").single();
   if (row.error) throw row.error;
   await supabase.from("capture_sessions").update({ used_at: now() }).eq("id", sessionId).eq("user_id", user.id);
   let streak = null;
   if (validation.status === "accepted") {
     const previousCat = await supabase.from("journal_entries").select("id").eq("user_id", user.id).eq("cat_type", catType).maybeSingle();
     await supabase.from("journal_entries").insert({ user_id: user.id, sighting_id: sightingId, cat_type: catType, spotted_at: new Date(capturedAt).toISOString(), first_spotted: !previousCat.data });
-    const localDay = new Intl.DateTimeFormat("en-CA", { timeZone: session.data.device_time_zone || "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(uploadedAt);
-    const old = await supabase.from("streaks").select("*").eq("user_id", user.id).maybeSingle();
-    const previousDay = old.data?.last_local_day ? new Date(`${old.data.last_local_day}T00:00:00Z`) : null;
-    const gap = previousDay ? Math.round((Date.parse(`${localDay}T00:00:00Z`) - previousDay.getTime()) / 86400000) : null;
-    const sameDay = old.data?.last_local_day === localDay;
-    const canFreeze = gap === 2 && Number(old.data?.freeze_count || 0) > 0;
-    const current = sameDay ? Number(old.data?.current_count || 0) : gap === 1 || canFreeze ? Number(old.data?.current_count || 0) + 1 : 1;
-    streak = { current, best: Math.max(current, Number(old.data?.best_count || 0)), freezes: Math.max(0, Number(old.data?.freeze_count || 1) - (canFreeze ? 1 : 0)) };
-    await supabase.from("streaks").upsert({ user_id: user.id, current_count: streak.current, best_count: streak.best, freeze_count: streak.freezes, last_local_day: localDay, updated_at: now() });
-    await supabase.from("reward_ledger").upsert({ user_id: user.id, sighting_id: sightingId, kind: "sighting_xp", amount: 24 });
-    await createNotification(supabase, user.id, "sighting", "Pawprint saved", `Your ${catType} sighting earned XP.`, "/#app");
+    if (captureSource === "camera") {
+      const localDay = new Intl.DateTimeFormat("en-CA", { timeZone: session.data.device_time_zone || "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(uploadedAt);
+      const old = await supabase.from("streaks").select("*").eq("user_id", user.id).maybeSingle();
+      const previousDay = old.data?.last_local_day ? new Date(`${old.data.last_local_day}T00:00:00Z`) : null;
+      const gap = previousDay ? Math.round((Date.parse(`${localDay}T00:00:00Z`) - previousDay.getTime()) / 86400000) : null;
+      const sameDay = old.data?.last_local_day === localDay;
+      const canFreeze = gap === 2 && Number(old.data?.freeze_count || 0) > 0;
+      const current = sameDay ? Number(old.data?.current_count || 0) : gap === 1 || canFreeze ? Number(old.data?.current_count || 0) + 1 : 1;
+      streak = { current, best: Math.max(current, Number(old.data?.best_count || 0)), freezes: Math.max(0, Number(old.data?.freeze_count || 1) - (canFreeze ? 1 : 0)) };
+      await supabase.from("streaks").upsert({ user_id: user.id, current_count: streak.current, best_count: streak.best, freeze_count: streak.freezes, last_local_day: localDay, updated_at: now() });
+      await supabase.from("reward_ledger").upsert({ user_id: user.id, sighting_id: sightingId, kind: "sighting_xp", amount: 24 });
+      await createNotification(supabase, user.id, "sighting", "Pawprint saved", `Your ${catType} sighting earned XP.`, "/#app");
+    }
   }
   if (validation.status !== "accepted") await supabase.from("moderation_queue").insert({ target_type: "sighting", target_id: sightingId, reason: validation.reason });
-  const body = { sightingId, status: validation.status, reason: validation.reason, catType, rarity: rarity(catType), description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), validation: { ...validation }, rewards: validation.status === "accepted" ? { xp: 24, streak } : null };
+  const body = { sightingId, status: validation.status, reason: validation.reason, catType, rarity: rarity(catType), description, publishedAt: publishedAt.toISOString(), expiresAt: expiresAt.toISOString(), validation: { ...validation }, rewardEligible: captureSource === "camera", rewards: validation.status === "accepted" && captureSource === "camera" ? { xp: 24, streak } : null };
   await supabase.from("request_keys").insert({ user_id: user.id, request_key: requestKey, response_json: body });
   return response(body, 201);
 }
@@ -385,29 +482,76 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
   if (path === "/api/me" || path === "/api/profile" && method === "GET") return response({ user: await profile(supabase, user) });
   if (path === "/api/profile" && method === "PATCH") {
     const body = await request.json().catch(() => ({}));
+    await ensureProfile(supabase, user);
     const fields: Record<string, unknown> = {};
-    if (body.displayName !== undefined) fields.nickname = String(body.displayName).slice(0, 40);
+    const onboardingCompleted = body.onboardingCompleted === true;
+    const nickname = body.displayName === undefined ? "" : String(body.displayName).trim();
+    if (onboardingCompleted && (!nickname || nicknameInvalid(nickname))) return errorResponse("INVALID_NICKNAME", 400, { message: "Choose a nickname with 3–20 letters, numbers, or underscores only. Do not use an email, phone number, or offensive word." });
+    if (body.displayName !== undefined && nicknameInvalid(nickname)) return errorResponse("INVALID_NICKNAME", 400, { message: "Choose a nickname with 3–20 letters, numbers, or underscores only." });
+    if (nickname) {
+      // Use an exact lookup here; the database index below is the final
+      // case-insensitive guard and avoids treating underscores as wildcards.
+      const existing = await supabase.from("profiles").select("id").eq("nickname", nickname).neq("id", user.id).limit(1).maybeSingle();
+      if (existing.error) throw existing.error;
+      if (existing.data) return errorResponse("NICKNAME_TAKEN", 409, { message: "That nickname is already taken. Try the dice for another one." });
+      fields.nickname = nickname;
+    }
     if (body.avatarUrl !== undefined) fields.avatar = String(body.avatarUrl).slice(0, 80);
+    const validAgeGroups = ["under_13", "13_17", "18_24", "25_34", "35_44", "45_plus", "prefer_not_to_say"];
+    if (body.ageGroup !== undefined && !validAgeGroups.includes(String(body.ageGroup))) return errorResponse("INVALID_AGE_GROUP", 400, { message: "Choose one of the available age groups." });
+    if (onboardingCompleted && body.ageGroup === undefined) return errorResponse("AGE_REQUIRED", 400, { message: "Choose an age group to continue." });
     if (body.ageGroup !== undefined) fields.age_group = String(body.ageGroup);
+    if (body.ageGroup === "under_13") return errorResponse("AGE_RESTRICTED", 400, { message: "Pawprint is for people aged 13 and above." });
+    if (onboardingCompleted && body.ageGroup === "13_17" && body.guardianConsent !== true) return errorResponse("GUARDIAN_CONSENT_REQUIRED", 400, { message: "Parent or legal guardian permission is required for ages 13–17." });
     if (body.gender !== undefined) fields.gender = String(body.gender).slice(0, 40);
-    if (body.locationArea !== undefined) fields.location_area = String(body.locationArea).trim().slice(0, 80);
+    if (body.locationArea !== undefined) {
+      const area = String(body.locationArea).trim();
+      if (onboardingCompleted && !MOBILE_AREAS.some((item) => item.toLowerCase() === area.toLowerCase())) return errorResponse("INVALID_AREA", 400, { message: "Choose a city or area from the suggestions. Exact addresses are not accepted." });
+      fields.location_area = area.slice(0, 80);
+    }
     if (body.onboardingCompleted !== undefined) fields.onboarding_completed = Boolean(body.onboardingCompleted);
     if (body.privacyConsentVersion !== undefined) fields.privacy_notice_version = String(body.privacyConsentVersion).slice(0, 40);
     if (body.privacyConsentAt !== undefined) fields.privacy_consent_at = String(body.privacyConsentAt);
+    if (body.catSpotterType !== undefined) fields.cat_spotter_type = ["casual", "daily", "rescuer"].includes(String(body.catSpotterType)) ? String(body.catSpotterType) : "casual";
+    if (body.streakReminders !== undefined) fields.streak_reminders = Boolean(body.streakReminders);
+    if (body.careFlagReminders !== undefined) fields.care_flag_reminders = Boolean(body.careFlagReminders);
+    if (body.safetyPledgeAccepted !== undefined) fields.safety_pledge_accepted = Boolean(body.safetyPledgeAccepted);
+    if (body.safetyPledgeAccepted === true) fields.safety_pledge_at = now();
+    if (body.termsAcceptedAt !== undefined) fields.terms_accepted_at = String(body.termsAcceptedAt);
+    if (body.guardianConsent === true) fields.guardian_consent_at = now();
+    if (onboardingCompleted && (body.safetyPledgeAccepted !== true || !body.privacyConsentAt || !body.termsAcceptedAt)) return errorResponse("CONSENT_REQUIRED", 400, { message: "Accept the safety pledge, Terms, and Privacy Policy to continue." });
     if (body.timeZone !== undefined) fields.time_zone = String(body.timeZone).slice(0, 80);
     if (body.language !== undefined) fields.language = String(body.language).slice(0, 20);
-    if (Object.keys(fields).length) await supabase.from("profiles").update(fields).eq("id", user.id);
-    if (body.allowFriendRequests !== undefined || body.notificationPreference !== undefined) await supabase.from("user_settings").upsert({ user_id: user.id, ...(body.allowFriendRequests === undefined ? {} : { allow_friend_requests: Boolean(body.allowFriendRequests) }), ...(body.notificationPreference === undefined ? {} : { notification_preference: String(body.notificationPreference) }), updated_at: now() });
+    if (Object.keys(fields).length) {
+      const updated = await supabase.from("profiles").update(fields).eq("id", user.id);
+      if (updated.error?.code === "23505") return errorResponse("NICKNAME_TAKEN", 409, { message: "That nickname is already taken. Try the dice for another one." });
+      if (updated.error) throw updated.error;
+    }
+    if (body.allowFriendRequests !== undefined || body.notificationPreference !== undefined) {
+      const settings = await supabase.from("user_settings").upsert({ user_id: user.id, ...(body.allowFriendRequests === undefined ? {} : { allow_friend_requests: Boolean(body.allowFriendRequests) }), ...(body.notificationPreference === undefined ? {} : { notification_preference: String(body.notificationPreference) }), updated_at: now() });
+      if (settings.error) throw settings.error;
+    }
+    if (body.visibility !== undefined) {
+      const visibility = String(body.visibility);
+      if (!['public', 'private'].includes(visibility)) return errorResponse("INVALID_VISIBILITY", 400, { message: "Choose Everyone or Only me." });
+      const settings = await supabase.from("user_settings").upsert({ user_id: user.id, default_visibility: visibility, updated_at: now() });
+      if (settings.error) throw settings.error;
+    }
     return response({ user: await profile(supabase, user) });
   }
   if (path === "/api/dashboard" && method === "GET") return response(await dashboard(supabase, user));
   if (path === "/api/progress" && method === "GET") return response(await progress(supabase, user));
   if (path === "/api/journal" && method === "GET") { const result = await supabase.from("journal_entries").select("*, sightings(*)").eq("user_id", user.id).order("spotted_at", { ascending: false }); return response({ entries: result.data || [], summary: { total: result.data?.length || 0, unique: result.data?.filter((item) => item.first_spotted).length || 0 } }); }
-  if (path === "/api/sightings" && method === "GET") { const result = await supabase.from("sightings").select("*").or(`user_id.eq.${user.id},and(visibility.eq.public,validation_status.eq.accepted)`).gt("expires_at", now()).order("captured_at", { ascending: false }).limit(100); return response({ sightings: (result.data || []).map(toSighting) }); }
+  if (path === "/api/sightings" && method === "GET") {
+    const blocked = await supabase.from("blocks").select("user_id,blocked_user_id").or(`user_id.eq.${user.id},blocked_user_id.eq.${user.id}`);
+    const blockedIds = new Set((blocked.data || []).map((item) => item.user_id === user.id ? item.blocked_user_id : item.user_id));
+    const result = await supabase.from("sightings").select("*,sighting_seen(count)").or(`user_id.eq.${user.id},and(visibility.eq.public,validation_status.eq.accepted)`).gt("expires_at", now()).order("captured_at", { ascending: false }).limit(100);
+    return response({ sightings: (result.data || []).filter((item) => item.public_geohash && (item.user_id === user.id || !blockedIds.has(item.user_id))).map(toSighting) });
+  }
   if (path === "/api/sightings" && method === "POST") return createSighting(request, supabase, user);
-  if (path === "/api/capture-sessions" && method === "POST") { const body = await request.json().catch(() => ({})); const result = await supabase.from("capture_sessions").insert({ user_id: user.id, device_time_zone: String(body.deviceTimeZone || "Asia/Manila"), camera_permission: String(body.cameraPermission || "denied"), location_permission: String(body.locationPermission || "denied"), expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() }).select("id").single(); if (result.error) throw result.error; return response({ sessionId: result.data.id }, 201); }
-  if (path === "/api/map" && method === "GET") { const blocked = await supabase.from("blocks").select("blocked_user_id").eq("user_id", user.id); const blockedIds = new Set((blocked.data || []).map((item) => item.blocked_user_id)); const result = await supabase.from("sightings").select("*").eq("visibility", "public").eq("validation_status", "accepted").lt("published_at", now()).gt("expires_at", now()).limit(100); return response({ sightings: (result.data || []).filter((item) => !blockedIds.has(item.user_id)).map(toSighting) }); }
-  if (path === "/api/care-flags" && method === "GET") { const result = await supabase.from("care_flags").select("*, sightings(cat_type)").eq("user_id", user.id).order("created_at", { ascending: false }); return response({ flags: result.data || [] }); }
+  if (path === "/api/capture-sessions" && method === "POST") { const body = await request.json().catch(() => ({})); const result = await supabase.from("capture_sessions").insert({ id: crypto.randomUUID(), user_id: user.id, device_time_zone: String(body.deviceTimeZone || "Asia/Manila"), camera_permission: String(body.cameraPermission || "denied"), location_permission: String(body.locationPermission || "denied"), expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), created_at: now() }).select("id").single(); if (result.error) throw result.error; return response({ sessionId: result.data.id }, 201); }
+  if (path === "/api/map" && method === "GET") { const blocked = await supabase.from("blocks").select("user_id,blocked_user_id").or(`user_id.eq.${user.id},blocked_user_id.eq.${user.id}`); const blockedIds = new Set((blocked.data || []).map((item) => item.user_id === user.id ? item.blocked_user_id : item.user_id)); const result = await supabase.from("sightings").select("*,sighting_seen(count)").eq("visibility", "public").eq("validation_status", "accepted").lt("published_at", now()).gt("expires_at", now()).limit(100); return response({ sightings: (result.data || []).filter((item) => !blockedIds.has(item.user_id)).map(toSighting) }); }
+  if (path === "/api/care-flags" && method === "GET") { const blocked = await supabase.from("blocks").select("user_id,blocked_user_id").or(`user_id.eq.${user.id},blocked_user_id.eq.${user.id}`); const blockedIds = new Set((blocked.data || []).map((item) => item.user_id === user.id ? item.blocked_user_id : item.user_id)); const result = await supabase.from("care_flags").select("id,sighting_id,kind,note,status,created_at,user_id,sightings(cat_type)").order("created_at", { ascending: false }).limit(100); return response({ flags: (result.data || []).filter((item) => !blockedIds.has(item.user_id)).map(({ user_id: _userId, ...item }) => item) }); }
   if (path === "/api/care-flags" && method === "POST") { const body = await request.json().catch(() => ({})); const result = await supabase.from("care_flags").insert({ user_id: user.id, sighting_id: body.sightingId, kind: String(body.kind || "other"), note: String(body.note || "").slice(0, 500) }).select("*").single(); if (result.error) throw result.error; return response({ flag: result.data }, 201); }
   if (path === "/api/notifications" && method === "GET") { const result = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50); return response({ notifications: result.data || [] }); }
   if (path.startsWith("/api/notifications/") && method === "PATCH") { const notificationId = path.split("/").pop(); await supabase.from("notifications").update({ read_at: now() }).eq("id", notificationId).eq("user_id", user.id); return response({ status: "read" }); }
@@ -447,21 +591,64 @@ async function callRoute(request: Request, path: string, supabase: SupabaseClien
   if (path === "/api/wrapped" && method === "GET") { const stats = await progress(supabase, user); return response({ shareText: `I have found ${stats.journal.total} cats and earned ${stats.xp} XP on Pawprint.` }); }
   if (path === "/api/share-card" && method === "GET") { const stats = await progress(supabase, user); return response({ card: { stats: { catsSpotted: stats.journal.unique, xp: stats.xp, bestStreak: stats.streak.best }, shareText: `Pawprint · ${stats.journal.unique} cats spotted · ${stats.xp} XP` } }); }
   if (path.startsWith("/api/admin/")) {
-    if (!adminIds().has(user.id)) return errorResponse("ADMIN_REQUIRED", 403);
+    if (!isAdmin(user)) return errorResponse("ADMIN_REQUIRED", 403);
     if (path === "/api/admin/analytics" && method === "GET") {
       const [users, sightings, accepted] = await Promise.all([supabase.from("profiles").select("id", { count: "exact", head: true }), supabase.from("sightings").select("id", { count: "exact", head: true }), supabase.from("sightings").select("id", { count: "exact", head: true }).eq("validation_status", "accepted")]);
       return response({ metrics: { users: users.count || 0, sightings: sightings.count || 0, acceptedPhotos: accepted.count || 0 } });
     }
     if (path === "/api/admin/moderation" && method === "GET") { const result = await supabase.from("moderation_queue").select("*").eq("status", "open").order("created_at", { ascending: false }); return response({ items: result.data || [] }); }
-    if (path === "/api/admin/care-flags" && method === "GET") { const result = await supabase.from("care_flags").select("*, sightings(cat_type)").eq("status", "open").order("created_at", { ascending: false }); return response({ flags: result.data || [] }); }
+    if (path === "/api/admin/care-flags" && method === "GET") { const result = await supabase.from("care_flags").select("*, sightings(cat_type)").eq("status", "open").order("created_at", { ascending: false }); return response({ items: result.data || [], flags: result.data || [] }); }
     if (path.startsWith("/api/admin/moderation/") && method === "POST") { const itemId = path.split("/").pop(); const body = await request.json().catch(() => ({})); await supabase.from("moderation_queue").update({ status: "resolved", action: body.action, assigned_to: user.id, resolved_at: now() }).eq("id", itemId); return response({ status: "resolved" }); }
     if (path.startsWith("/api/admin/care-flags/") && method === "PATCH") { const itemId = path.split("/").pop(); const body = await request.json().catch(() => ({})); await supabase.from("care_flags").update({ status: body.status || "helped" }).eq("id", itemId); return response({ status: "updated" }); }
   }
-  if (path === "/api/account" && method === "DELETE") { await supabase.rpc("delete_pawprint_user_data", { target_user: user.id }); const deleted = await supabase.auth.admin.deleteUser(user.id); if (deleted.error) throw deleted.error; return response({ status: "deleted" }); }
+  if (path === "/api/account" && method === "DELETE") {
+    const listed = await supabase.storage.from("pawprint-sightings").list(user.id, { limit: 1000 });
+    if (listed.error) throw listed.error;
+    const paths = (listed.data || []).map((item) => `${user.id}/${item.name}`).filter(Boolean);
+    if (paths.length) {
+      const removed = await supabase.storage.from("pawprint-sightings").remove(paths);
+      if (removed.error) throw removed.error;
+    }
+    await removeBrevoContact(String(user.email || "").trim().toLowerCase());
+    const cleared = await supabase.rpc("delete_pawprint_user_data", { target_user: user.id });
+    if (cleared.error) throw cleared.error;
+    const deleted = await supabase.auth.admin.deleteUser(user.id);
+    if (deleted.error) throw deleted.error;
+    return response({ status: "deleted" });
+  }
   if (path.startsWith("/api/sightings/") && path.endsWith("/photo") && method === "GET") { const sightingId = path.split("/").slice(-2, -1)[0]; const item = await supabase.from("sightings").select("storage_path,user_id,visibility").eq("id", sightingId).maybeSingle(); if (!item.data || (item.data.user_id !== user.id && item.data.visibility !== "public")) return errorResponse("NOT_FOUND", 404); const signed = await supabase.storage.from("pawprint-sightings").createSignedUrl(item.data.storage_path, 300); if (signed.error) throw signed.error; return Response.redirect(signed.data.signedUrl, 302); }
   if (path.startsWith("/api/sightings/") && method === "DELETE") { const sightingId = path.split("/").pop(); const item = await supabase.from("sightings").select("storage_path").eq("id", sightingId).eq("user_id", user.id).maybeSingle(); if (!item.data) return errorResponse("SIGHTING_NOT_FOUND", 404); if (item.data.storage_path) await supabase.storage.from("pawprint-sightings").remove([item.data.storage_path]); await supabase.from("sightings").delete().eq("id", sightingId).eq("user_id", user.id); return response({ status: "deleted", sightingId }); }
-  if (path === "/api/reports" && method === "POST") { const body = await request.json(); const result = await supabase.from("reports").insert({ user_id: user.id, target_type: body.targetType, target_id: String(body.targetId), reason: body.reason, note: body.note }); if (result.error) throw result.error; return response({ status: "reported" }, 201); }
-  if (path === "/api/blocks" && method === "POST") { const body = await request.json(); const result = await supabase.from("blocks").upsert({ user_id: user.id, blocked_user_id: body.blockedUserId }); if (result.error) throw result.error; return response({ status: "blocked" }, 201); }
+  if (path === "/api/sightings/seen" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const sightingId = String(body.sightingId || "");
+    if (!sightingId) return errorResponse("SIGHTING_REQUIRED", 400);
+    const sighting = await supabase.from("sightings").select("id,user_id").eq("id", sightingId).eq("validation_status", "accepted").maybeSingle();
+    if (!sighting.data) return errorResponse("SIGHTING_NOT_FOUND", 404);
+    const blocked = await supabase.from("blocks").select("user_id,blocked_user_id").or(`user_id.eq.${user.id},blocked_user_id.eq.${user.id}`);
+    if ((blocked.data || []).some((item) => (item.user_id === user.id ? item.blocked_user_id : item.user_id) === sighting.data.user_id)) return errorResponse("SIGHTING_BLOCKED", 403);
+    const marked = await supabase.rpc("mark_sighting_seen", { target_user: user.id, target_sighting: sightingId });
+    if (marked.error) throw marked.error;
+    return response({ status: marked.data ? "marked" : "already_marked" });
+  }
+  if (path === "/api/reports" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const targetType = String(body.targetType || "");
+    const targetId = String(body.targetId || "");
+    const reason = String(body.reason || "other").slice(0, 80);
+    if (!['sighting', 'care_flag', 'profile'].includes(targetType) || !targetId) return errorResponse("INVALID_REPORT", 400);
+    const result = await supabase.from("reports").insert({ user_id: user.id, target_type: targetType, target_id: targetId, reason, note: String(body.note || "").slice(0, 500) });
+    if (result.error) throw result.error;
+    await supabase.from("moderation_queue").insert({ target_type: targetType, target_id: targetId, reason: `USER_REPORT:${reason}` });
+    return response({ status: "reported" }, 201);
+  }
+  if (path === "/api/blocks" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const blockedUserId = await resolveTargetUserId(supabase, body);
+    if (!blockedUserId || blockedUserId === user.id) return errorResponse("INVALID_BLOCK", 400);
+    const result = await supabase.from("blocks").upsert({ user_id: user.id, blocked_user_id: blockedUserId });
+    if (result.error) throw result.error;
+    return response({ status: "blocked" }, 201);
+  }
   if (path === "/api/export" && method === "POST") { const [p, j, s, r, c] = await Promise.all([profile(supabase, user), supabase.from("journal_entries").select("*").eq("user_id", user.id), supabase.from("sightings").select("*").eq("user_id", user.id), supabase.from("reward_ledger").select("*").eq("user_id", user.id), supabase.from("care_flags").select("*").eq("user_id", user.id)]); return new Response(JSON.stringify({ exportedAt: now(), profile: p, journal: j.data || [], sightings: s.data || [], rewards: r.data || [], careFlags: c.data || [] }), { headers: { ...headers, "content-type": "application/json", "content-disposition": "attachment; filename=pawprint-export.json" } }); }
   return errorResponse("NOT_FOUND", 404);
 }

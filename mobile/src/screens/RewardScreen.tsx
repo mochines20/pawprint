@@ -50,7 +50,7 @@ export function RewardScreen({ navigation, route }: Props) {
           <AppText size={30} weight="bold">{coat.name} spotted!</AppText>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
             <RarityTag rarity={coat.rarity} />
-            <AppText size={12} muted>Today · Alabang area</AppText>
+            <AppText size={12} muted>Today · Muntinlupa area</AppText>
           </View>
         </View>
       </Rise>
@@ -82,6 +82,9 @@ export function RewardScreen({ navigation, route }: Props) {
 
       <View style={{ position: 'absolute', left: space.lg, right: space.lg, bottom: insets.bottom + 18 }}>
         <Button label="Add to my Cat Journal" onPress={() => navigation.popToTop()} />
+        <View style={{ marginTop: 10 }}>
+          <Button label="Share this pawprint" variant="ghost" onPress={() => navigation.navigate('ShareCard', { variant, xp, isNewCoat, photoUri, area: 'Muntinlupa' })} />
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 12 }}>
           <Icon name="lock" size={13} color={t.stone} />
           <AppText size={12} muted>Shown as an approximate pin for 24 hours</AppText>

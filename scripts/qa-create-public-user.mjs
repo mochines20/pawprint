@@ -1,0 +1,10 @@
+import process from 'node:process';
+import { createRequire } from 'node:module';
+const require = createRequire(new URL('../mobile/package.json', import.meta.url));
+const { createClient } = require('@supabase/supabase-js');
+const client = createClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const email = process.env.PAWPRINT_QA_USER_EMAIL;
+const password = process.env.PAWPRINT_QA_USER_PASSWORD;
+const result = await client.auth.signUp({ email, password });
+if (result.error) throw new Error(result.error.message);
+console.log(JSON.stringify({ userId: result.data.user?.id || null, hasSession: Boolean(result.data.session) }));

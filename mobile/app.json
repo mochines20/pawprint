@@ -6,29 +6,63 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-      "newArchEnabled": true,
+    "newArchEnabled": true,
     "icon": "./assets/logo.png",
-    "splash": { "image": "./assets/logo.png", "resizeMode": "contain", "backgroundColor": "#FAF8F4" },
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF8F4"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.pawprint.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Pawprint uses the camera so you can photograph street cats. Photos are camera-only and location data is removed.",
-        "NSLocationWhenInUseUsageDescription": "Pawprint uses your location to show cats nearby. Pins are always shown as approximate areas."
+        "NSLocationWhenInUseUsageDescription": "Pawprint uses your location to show cats nearby. Pins are always shown as approximate areas.",
+        "NSPhotoLibraryUsageDescription": "Pawprint lets you choose a cat photo for your private Journal. Gallery photos are not eligible for public pins, XP, or streaks.",
+        "NSPhotoLibraryAddUsageDescription": "Pawprint does not need to save photos to your library.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.pawprint.app",
-      "permissions": ["CAMERA", "ACCESS_COARSE_LOCATION"],
-      "adaptiveIcon": { "foregroundImage": "./assets/logo.png", "backgroundColor": "#FAF8F4" }
+      "permissions": [
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#FAF8F4"
+      }
     },
     "plugins": [
       "expo-font",
-        "@maplibre/maplibre-react-native",
-      ["expo-camera", { "cameraPermission": "Pawprint uses the camera so you can photograph street cats." }],
-      ["expo-location", { "locationWhenInUsePermission": "Pawprint shows cats near you as approximate areas." }],
-      ["expo-image-picker", { "photosPermission": "Choose a cat photo from your library." }]
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Pawprint uses the camera so you can photograph street cats."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Pawprint shows cats near you as approximate areas."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a cat photo from your library."
+        }
+      ],
+      "expo-sharing"
     ],
-    "extra": {}
+    "extra": {
+      "privacyUrl": "https://pawprint-omega.vercel.app/privacy",
+      "termsUrl": "https://pawprint-omega.vercel.app/terms",
+      "supportUrl": "https://pawprint-omega.vercel.app/support",
+      "accountDeletionUrl": "https://pawprint-omega.vercel.app/support#account-deletion"
+    }
   }
 }

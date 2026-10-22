@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Linking } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { Fredoka_400Regular, Fredoka_500Medium, Fredoka_600SemiBold, Fredoka_700Bold, useFonts } from '@expo-google-fonts/fredoka';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +14,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { AppFlow } from '@/navigation/AppFlow';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { LaunchScreen } from '@/screens/LaunchScreen';
+import { PasswordResetScreen } from '@/screens/PasswordResetScreen';
 
 const ONBOARD_KEY = 'pawprint:onboarded';
 
@@ -23,6 +25,23 @@ export default function App() {
   const [launching, setLaunching] = useState(true);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [profileSetupComplete, setProfileSetupComplete] = useState<boolean | null>(!isSupabaseConfigured);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+
+  useEffect(() => {
+    const handleUrl = async (url: string | null | undefined) => {
+      if (!url) return;
+      const fragment = url.split('#')[1] || url.split('?')[1] || '';
+      const values = new URLSearchParams(fragment);
+      if (values.get('type') !== 'recovery') return;
+      const accessToken = values.get('access_token');
+      const refreshToken = values.get('refresh_token');
+      if (accessToken && refreshToken) await import('@/lib/supabase').then(({ supabase }) => supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }));
+      setPasswordRecovery(true);
+    };
+    Linking.getInitialURL().then(handleUrl).catch(() => undefined);
+    const subscription = Linking.addEventListener('url', ({ url }) => { void handleUrl(url); });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARD_KEY).then((v) => setOnboarded(v === '1')).catch(() => setOnboarded(false));
@@ -64,7 +83,7 @@ export default function App() {
       <SafeAreaProvider>
         <AppFlow.Provider value={{ finishOnboarding, finishProfileSetup }}>
           <NavigationContainer theme={navTheme}>
-            <RootNavigator onboarded={onboarded} signedIn={!!session} needsProfileSetup={isSupabaseConfigured && !!session && !profileSetupComplete} />
+            <RootNavigator onboarded={onboarded} signedIn={!!session} needsProfileSetup={isSupabaseConfigured && !!session && !profileSetupComplete} passwordRecovery={passwordRecovery} onPasswordRecoveryDone={() => setPasswordRecovery(false)} />
           </NavigationContainer>
         </AppFlow.Provider>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />

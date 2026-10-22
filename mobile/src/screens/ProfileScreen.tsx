@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 import { SvgXml } from 'react-native-svg';
 import { AppText, Button, Card, CatAvatar, HardShadow, Icon, ProgressBar, Screen, ScreenHeader } from '@/components';
-import { fetchProfile, fetchProgress, updateProfile } from '@/lib/api';
+import { changeEmail, deleteAccount, fetchProfile, fetchProgress, updateProfile } from '@/lib/api';
 import { AVATAR_CHOICES, AvatarId } from '@/lib/avatarCatalog';
 import { useAsync } from '@/hooks/useAsync';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
@@ -38,14 +38,18 @@ export function ProfileScreen() {
   const t = useTheme();
   const { data: profile } = useAsync(fetchProfile, null);
   const { data: progress } = useAsync(fetchProgress, null);
-  const vis = ['Everyone', 'Friends', 'Only me'];
-  const [v, setV] = useState(1);
+  const vis = ['Everyone', 'Only me'];
+  const [v, setV] = useState(0);
   const [approx, setApprox] = useState(true);
   const [confirm, setConfirm] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarId>('cat-ink');
+  const [deleting, setDeleting] = useState(false);
+  const [emailModal, setEmailModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
   useEffect(() => {
-    if (profile?.visibility) setV(profile.visibility === 'public' ? 0 : profile.visibility === 'private' ? 2 : 1);
+    if (profile?.visibility) setV(profile.visibility === 'private' ? 1 : 0);
     if (typeof profile?.approximate_map === 'boolean') setApprox(profile.approximate_map);
     if (profile?.avatar_url) setSelectedAvatar(profile.avatar_url as AvatarId);
   }, [profile?.visibility, profile?.approximate_map, profile?.avatar_url]);
@@ -120,9 +124,9 @@ export function ProfileScreen() {
       <AppText size={15} weight="bold" style={{ marginTop: 16 }}>Privacy controls</AppText>
       <Row label="Public visibility">
         <Pressable accessibilityRole="button" onPress={() => {
-          const next = (v + 1) % 3;
+          const next = (v + 1) % 2;
           setV(next);
-          void updateProfile({ visibility: ['public', 'friends', 'private'][next] }).catch(() => undefined);
+          void updateProfile({ visibility: ['public', 'private'][next] }).catch(() => undefined);
         }} style={{ borderWidth: 1.5, borderColor: t.edge, borderRadius: radius.chip, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: t.card }}>
           <AppText size={13} weight="semi">{vis[v]} ›</AppText>
         </Pressable>
@@ -132,6 +136,10 @@ export function ProfileScreen() {
       </Row>
       <Row label="Delay pins by 5 minutes"><AppText size={13} weight="semi">Always on</AppText></Row>
 
+      <Row label="Email address">
+        <Pressable accessibilityRole="button" onPress={() => setEmailModal(true)}><AppText size={13} weight="semi" color={t.ink}>Change ›</AppText></Pressable>
+      </Row>
+
       <View style={{ paddingVertical: 11 }}>
         {confirm ? (
           <Card>
@@ -139,7 +147,10 @@ export function ProfileScreen() {
             <AppText size={12} muted style={{ marginTop: 4, marginBottom: 10 }}>Photos and sightings are removed permanently, including files in storage.</AppText>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Button small variant="ghost" label="Keep my data" onPress={() => setConfirm(false)} style={{ flex: 1 }} />
-              <Button small variant="red" label="Delete" onPress={() => setConfirm(false) /* call your delete-account edge function here */} style={{ flex: 1 }} />
+              <Button small variant="red" label={deleting ? 'Deleting…' : 'Delete'} disabled={deleting} onPress={() => {
+                setDeleting(true);
+                void deleteAccount().then(async () => { await supabase.auth.signOut({ scope: 'local' }); }).catch((error) => Alert.alert('Could not delete account', error instanceof Error ? error.message : 'Please try again.')).finally(() => { setDeleting(false); setConfirm(false); });
+              }} style={{ flex: 1 }} />
             </View>
           </Card>
         ) : (
@@ -149,6 +160,22 @@ export function ProfileScreen() {
         )}
       </View>
       {isSupabaseConfigured && <Button variant="ghost" small label="Sign out" onPress={() => supabase.auth.signOut()} style={{ marginTop: space.sm }} />}
+      <Modal visible={emailModal} transparent animationType="slide" onRequestClose={() => setEmailModal(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <Card style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: space.lg }}>
+            <AppText size={20} weight="bold">Change email</AppText>
+            <AppText size={12} muted style={{ marginTop: 4 }}>Supabase will send a confirmation link to the new address.</AppText>
+            <TextInput value={newEmail} onChangeText={setNewEmail} autoCapitalize="none" keyboardType="email-address" placeholder="New email address" placeholderTextColor={t.stone} style={{ marginTop: 14, borderWidth: 1.5, borderColor: t.edge, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, color: t.ink, backgroundColor: t.bg }} />
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <Button small variant="ghost" label="Cancel" onPress={() => setEmailModal(false)} style={{ flex: 1 }} />
+              <Button small label={emailBusy ? 'Saving…' : 'Send confirmation'} disabled={emailBusy || !newEmail.includes('@')} onPress={() => {
+                setEmailBusy(true);
+                void changeEmail(newEmail).then(() => { Alert.alert('Check your email', 'Confirm the change from the new address.'); setEmailModal(false); setNewEmail(''); }).catch((error) => Alert.alert('Could not change email', error instanceof Error ? error.message : 'Please try again.')).finally(() => setEmailBusy(false));
+              }} style={{ flex: 1 }} />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </Screen>
   );
 }
