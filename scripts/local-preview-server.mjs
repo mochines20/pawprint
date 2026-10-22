@@ -122,7 +122,8 @@ function sendJson(response, data, status = 200) {
 }
 
 function safePath(requestPath) {
-  const relative = requestPath === "/" ? "index.html" : requestPath === "/admin" ? "admin.html" : requestPath.replace(/^\/+/, "");
+  const cleanPages = { "/privacy": "privacy.html", "/terms": "terms.html", "/support": "support.html" };
+  const relative = requestPath === "/" ? "index.html" : requestPath === "/admin" ? "admin.html" : cleanPages[requestPath] || requestPath.replace(/^\/+/, "");
   const target = resolve(root, normalize(relative));
   return target.startsWith(`${root}${sep}`) ? target : null;
 }
